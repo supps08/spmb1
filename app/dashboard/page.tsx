@@ -9,16 +9,36 @@
 // ============================================================
 
 "use client";
+
 import { useState, useEffect, useCallback } from "react";
+import {
+  Users,
+  LogIn,
+  CheckCircle,
+  XCircle,
+  Eye,
+} from "lucide-react";
+import { useScrollAnimation } from "@/lib/useScrollAnimation";
 
 interface User {
-  id: string; name: string; email: string; role: string;
+  id: string;
+  name: string;
+  email: string;
+  role: string;
 }
+
 interface LoginEntry {
-  id: string; userId: string; email: string; name: string;
-  status: "success" | "failed"; ip: string; userAgent: string;
-  timestamp: string; reason?: string;
+  id: string;
+  userId: string;
+  email: string;
+  name: string;
+  status: "success" | "failed";
+  ip: string;
+  userAgent: string;
+  timestamp: string;
+  reason?: string;
 }
+
 interface StatsData {
   totalUsers: number;
   totalLogins: number;
@@ -26,7 +46,30 @@ interface StatsData {
   successRate: number;
 }
 
+const AVATAR_COLORS = [
+  { bg: "#EBF4EE", color: "#1C5C38" },
+  { bg: "#D1FAE5", color: "#065F46" },
+  { bg: "#E0E7FF", color: "#3730A3" },
+  { bg: "#FEF3C7", color: "#92400E" },
+  { bg: "#FEE2E2", color: "#991B1B" },
+  { bg: "#FCE7F3", color: "#9D174D" },
+];
+
+function avatarColor(name: string) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+function displayName(entry: LoginEntry) {
+  return entry.name !== "-" ? entry.name : entry.email;
+}
+
 export default function DashboardPage() {
+  useScrollAnimation();
+
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [history, setHistory] = useState<LoginEntry[]>([]);
   const [stats, setStats] = useState<StatsData | null>(null);
@@ -57,7 +100,6 @@ export default function DashboardPage() {
           failedLogins: failed,
           successRate: total > 0 ? Math.round((success / total) * 100) : 100,
         });
-        // Pulse animation on update
         setPulse(true);
         setTimeout(() => setPulse(false), 600);
         setLastUpdated(new Date());
@@ -69,7 +111,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchAll();
-    const interval = setInterval(fetchAll, 15000); // real-time every 15s
+    const interval = setInterval(fetchAll, 15000);
     return () => clearInterval(interval);
   }, [fetchAll]);
 
@@ -91,250 +133,463 @@ export default function DashboardPage() {
     return "Browser";
   }
 
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Selamat pagi" : hour < 17 ? "Selamat siang" : "Selamat malam";
+  const roleLabel =
+    currentUser?.role === "admin" ? "ADMINISTRATOR" : "PENGGUNA";
+
+  const displayStats = stats ?? {
+    totalUsers: 0,
+    totalLogins: 0,
+    failedLogins: 0,
+    successRate: 100,
+  };
 
   return (
     <>
       <style>{`
-        :root {
-          --cream: #FDF6EE; --cream-dark: #F5EAD8; --blush: #F2C4C4;
-          --blush-light: #FAE8E8; --sage: #C8DDD1; --lavender: #DDD2EE;
-          --warm-brown: #8B6B52; --text-dark: #3D2B1F; --text-mid: #7A5C48;
-          --text-light: #B89A86; --white: #FFFFFF;
-        }
-        .page { display: flex; flex-direction: column; gap: 24px; }
+        @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700;800&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap');
 
-        /* Welcome banner */
-        .welcome-banner {
-          background: linear-gradient(135deg, var(--warm-brown) 0%, #A0785A 50%, #C49A7A 100%);
-          border-radius: 20px; padding: 28px 32px;
-          color: white; position: relative; overflow: hidden;
+        .page {
+          display: flex;
+          flex-direction: column;
+          gap: 24px;
+          font-family: 'Plus Jakarta Sans', sans-serif;
         }
-        .welcome-banner::before {
-          content: '🎓';
-          position: absolute; right: 28px; top: 50%;
+
+        /* Hero */
+        .hero-banner {
+          position: relative;
+          overflow: hidden;
+          border-radius: 12px;
+          padding: 28px 32px;
+          background: linear-gradient(135deg, #1C5C38 0%, #2A7A4E 100%);
+          color: #fff;
+          animation: fadeUp 0.6s ease;
+        }
+
+        .hero-deco {
+          position: absolute;
+          right: -40px;
+          top: 50%;
           transform: translateY(-50%);
-          font-size: 72px; opacity: 0.15;
+          width: 200px;
+          height: 200px;
+          border-radius: 50%;
+          background: rgba(255, 255, 255, 0.05);
+          pointer-events: none;
         }
-        .welcome-banner h2 {
-          font-family: 'Playfair Display', serif;
-          font-size: 22px; font-weight: 600; margin-bottom: 6px;
+
+        .hero-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          background: rgba(255, 255, 255, 0.15);
+          padding: 5px 12px;
+          border-radius: 20px;
+          margin-bottom: 12px;
         }
-        .welcome-banner p { font-size: 13.5px; opacity: 0.85; }
-        .role-badge {
-          display: inline-block; margin-top: 12px;
-          background: rgba(255,255,255,0.2); padding: 4px 12px;
-          border-radius: 20px; font-size: 12px; font-weight: 500;
-          backdrop-filter: blur(4px);
+
+        .hero-badge-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: #fff;
+        }
+
+        .hero-title {
+          font-family: 'Bricolage Grotesque', sans-serif;
+          font-size: clamp(1.35rem, 3vw, 1.75rem);
+          font-weight: 800;
+          line-height: 1.2;
+          margin-bottom: 8px;
+        }
+
+        .hero-subtitle {
+          font-size: 14px;
+          opacity: 0.88;
+          max-width: 480px;
+          line-height: 1.5;
         }
 
         /* Stats */
         .stats-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+          grid-template-columns: repeat(4, 1fr);
           gap: 16px;
         }
+
         .stat-card {
-          background: var(--white); border-radius: 16px;
-          padding: 20px; border: 1px solid var(--cream-dark);
-          transition: transform .2s, box-shadow .2s;
-          position: relative; overflow: hidden;
+          background: #fff;
+          border: 1px solid #E5E7EB;
+          border-radius: 8px;
+          padding: 20px;
+          transition: transform 0.2s, box-shadow 0.2s;
+          border-bottom: 2px solid var(--stat-accent, #1C5C38);
         }
+
         .stat-card:hover {
           transform: translateY(-2px);
-          box-shadow: 0 6px 20px rgba(139,107,82,0.12);
+          box-shadow: 0 4px 16px rgba(28, 92, 56, 0.1);
         }
-        .stat-card::before {
-          content: ''; position: absolute;
-          bottom: 0; left: 0; right: 0; height: 3px;
+
+        .stat-card.danger {
+          --stat-accent: #DC2626;
         }
-        .stat-card.brown::before { background: linear-gradient(90deg, var(--warm-brown), #C49A7A); }
-        .stat-card.blush::before { background: linear-gradient(90deg, var(--blush), #F9A8A8); }
-        .stat-card.sage::before { background: linear-gradient(90deg, var(--sage), #A8CCBA); }
-        .stat-card.lavender::before { background: linear-gradient(90deg, var(--lavender), #C4B4E4); }
-        .stat-icon {
-          width: 40px; height: 40px; border-radius: 10px;
-          display: flex; align-items: center; justify-content: center;
-          font-size: 18px; margin-bottom: 12px;
+
+        .stat-icon-wrap {
+          width: 40px;
+          height: 40px;
+          border-radius: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-bottom: 14px;
+          background: #EBF4EE;
+          color: #1C5C38;
         }
-        .stat-icon.brown { background: var(--cream-dark); }
-        .stat-icon.blush { background: var(--blush-light); }
-        .stat-icon.sage { background: #EAF4EF; }
-        .stat-icon.lavender { background: #F0ECFB; }
+
+        .stat-card.danger .stat-icon-wrap {
+          background: #FEE2E2;
+          color: #DC2626;
+        }
+
         .stat-value {
-          font-size: 28px; font-weight: 700; color: var(--text-dark);
-          font-family: 'Playfair Display', serif;
-          transition: all .3s;
+          font-family: 'Bricolage Grotesque', sans-serif;
+          font-size: 28px;
+          font-weight: 800;
+          color: #0C0C0C;
+          line-height: 1;
+          transition: transform 0.3s;
         }
-        .stat-value.pulse { animation: statPulse .4s ease; }
+
+        .stat-card.danger .stat-value {
+          color: #DC2626;
+        }
+
+        .stat-value.pulse {
+          animation: statPulse 0.4s ease;
+        }
+
         @keyframes statPulse {
-          0%,100% { transform: scale(1); }
-          50% { transform: scale(1.08); }
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.06); }
         }
+
         .stat-label {
-          font-size: 12px; color: var(--text-light);
-          margin-top: 4px; text-transform: uppercase;
-          letter-spacing: 0.4px; font-weight: 500;
+          font-size: 12px;
+          font-weight: 500;
+          color: #6B7280;
+          margin-top: 6px;
         }
 
         /* History panel */
         .panel {
-          background: var(--white); border-radius: 20px;
-          border: 1px solid var(--cream-dark); overflow: hidden;
-        }
-        .panel-header {
-          padding: 18px 22px; border-bottom: 1px solid var(--cream-dark);
-          display: flex; align-items: center; justify-content: space-between;
-        }
-        .panel-header h3 {
-          font-family: 'Playfair Display', serif;
-          font-size: 16px; color: var(--text-dark); font-weight: 600;
-        }
-        .live-indicator {
-          display: flex; align-items: center; gap: 6px;
-          font-size: 11.5px; color: var(--text-light); font-weight: 500;
-        }
-        .live-dot {
-          width: 7px; height: 7px; border-radius: 50%;
-          background: #2ECC71; animation: livePulse 2s infinite;
-        }
-        @keyframes livePulse {
-          0%,100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.5; transform: scale(0.8); }
+          background: #fff;
+          border: 1px solid #E5E7EB;
+          border-radius: 8px;
+          overflow: hidden;
         }
 
-        /* History table */
-        .history-table { width: 100%; border-collapse: collapse; }
-        .history-table th {
-          text-align: left; padding: 10px 22px;
-          font-size: 11px; text-transform: uppercase;
-          letter-spacing: 0.5px; color: var(--text-light);
-          background: var(--cream); font-weight: 600;
-          border-bottom: 1px solid var(--cream-dark);
+        .panel-header {
+          padding: 18px 22px;
+          border-bottom: 1px solid #E5E7EB;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 10px;
         }
+
+        .panel-header h3 {
+          font-family: 'Bricolage Grotesque', sans-serif;
+          font-size: 16px;
+          font-weight: 700;
+          color: #0C0C0C;
+        }
+
+        .live-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 0.05em;
+          text-transform: uppercase;
+          color: #6B7280;
+        }
+
+        .live-dot {
+          width: 7px;
+          height: 7px;
+          border-radius: 50%;
+          background: #10B981;
+          animation: pulse-dot 2s infinite;
+        }
+
+        .history-table {
+          width: 100%;
+          border-collapse: collapse;
+        }
+
+        .history-table th {
+          text-align: left;
+          padding: 12px 20px;
+          font-size: 12px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          color: #6B7280;
+          background: #F9FAFB;
+          border-bottom: 1px solid #E5E7EB;
+        }
+
         .history-table td {
-          padding: 13px 22px; border-bottom: 1px solid var(--cream-dark);
-          font-size: 13.5px; color: var(--text-mid);
+          padding: 14px 20px;
+          border-bottom: 1px solid #E5E7EB;
+          font-size: 13px;
+          color: #374151;
           vertical-align: middle;
         }
-        .history-table tr:last-child td { border-bottom: none; }
-        .history-table tr { transition: background .15s; }
-        .history-table tr:hover td { background: var(--cream); }
-        .history-table tr.new-row td {
-          animation: rowSlide .4s ease;
+
+        .history-table tr:last-child td {
+          border-bottom: none;
         }
-        @keyframes rowSlide {
-          from { background: #EDFBF2; }
+
+        .history-table tbody tr {
+          transition: background 0.15s;
+        }
+
+        .history-table tbody tr:hover td {
+          background: #F9FAFB;
+        }
+
+        .history-table tbody tr.new-row td {
+          animation: rowHighlight 0.4s ease;
+        }
+
+        @keyframes rowHighlight {
+          from { background: #EBF4EE; }
           to { background: transparent; }
         }
 
-        .status-badge {
-          display: inline-flex; align-items: center; gap: 5px;
-          padding: 3px 10px; border-radius: 20px;
-          font-size: 11.5px; font-weight: 600;
+        .user-cell {
+          display: flex;
+          align-items: center;
+          gap: 10px;
         }
-        .status-badge.success {
-          background: #EDFBF2; color: #27AE60;
+
+        .row-avatar {
+          width: 34px;
+          height: 34px;
+          border-radius: 50%;
+          font-size: 13px;
+          font-weight: 600;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
         }
-        .status-badge.failed {
-          background: #FFF0F0; color: #E74C3C;
+
+        .user-name {
+          font-weight: 600;
+          color: #0C0C0C;
+          font-size: 13px;
         }
-        .email-cell { font-weight: 500; color: var(--text-dark); }
+
+        .user-email {
+          font-size: 11px;
+          color: #6B7280;
+          margin-top: 2px;
+        }
+
         .ip-cell {
-          font-family: monospace; font-size: 12px;
-          background: var(--cream); padding: 2px 7px;
-          border-radius: 5px; display: inline-block;
+          font-family: ui-monospace, monospace;
+          font-size: 12px;
+          color: #374151;
         }
-        .time-cell { color: var(--text-light); font-size: 12.5px; }
+
+        .time-cell {
+          font-size: 12px;
+          color: #6B7280;
+        }
+
+        .status-badge {
+          display: inline-block;
+          padding: 4px 10px;
+          border-radius: 6px;
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 0.03em;
+        }
+
+        .status-badge.success {
+          background: #D1FAE5;
+          color: #065F46;
+        }
+
+        .status-badge.failed {
+          background: #FEE2E2;
+          color: #991B1B;
+        }
+
+        .aksi-btn {
+          width: 32px;
+          height: 32px;
+          border: 1px solid #E5E7EB;
+          border-radius: 6px;
+          background: #fff;
+          color: #6B7280;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: background 0.15s, color 0.15s, border-color 0.15s;
+        }
+
+        .aksi-btn:hover {
+          background: #F2F8F4;
+          color: #1C5C38;
+          border-color: #EBF4EE;
+        }
+
+        .fail-reason {
+          font-size: 11px;
+          color: #DC2626;
+          margin-top: 4px;
+        }
 
         .loading-state {
-          text-align: center; padding: 48px;
-          color: var(--text-light); font-size: 13px;
+          text-align: center;
+          padding: 48px;
+          color: #6B7280;
+          font-size: 13px;
         }
+
         .loading-state .spinner {
-          width: 28px; height: 28px; border: 3px solid var(--cream-dark);
-          border-top-color: var(--warm-brown); border-radius: 50%;
-          animation: spin 0.8s linear infinite; margin: 0 auto 12px;
+          width: 28px;
+          height: 28px;
+          border: 3px solid #E5E7EB;
+          border-top-color: #1C5C38;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+          margin: 0 auto 12px;
         }
-        @keyframes spin { to { transform: rotate(360deg); } }
+
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
 
         .empty-state {
-          text-align: center; padding: 48px;
-          color: var(--text-light);
+          text-align: center;
+          padding: 48px;
+          color: #6B7280;
+          font-size: 13px;
         }
-        .empty-state .empty-icon { font-size: 32px; margin-bottom: 10px; }
-        .empty-state p { font-size: 13px; }
 
         .updated-label {
-          font-size: 11px; color: var(--text-light);
-          text-align: right; padding: 10px 22px;
+          font-size: 11px;
+          color: #6B7280;
+          text-align: right;
+          padding: 10px 20px;
         }
 
-        @media (max-width: 640px) {
-          .stats-grid { grid-template-columns: 1fr 1fr; }
+        @media (max-width: 1024px) {
+          .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+
+        @media (max-width: 768px) {
+          .stats-grid {
+            grid-template-columns: 1fr;
+          }
+
           .history-table th:nth-child(3),
           .history-table td:nth-child(3),
           .history-table th:nth-child(4),
-          .history-table td:nth-child(4) { display: none; }
+          .history-table td:nth-child(4) {
+            display: none;
+          }
         }
       `}</style>
 
       <div className="page">
-        {/* Welcome */}
-        <div className="welcome-banner">
-          <h2>{greeting}, {currentUser?.name ?? "—"} 👋</h2>
-          <p>Pantau aktivitas sistem SPMB secara real-time dari sini.</p>
-          <span className="role-badge">
-            {currentUser?.role === "admin" ? "🛡️ Administrator" : "👤 Pengguna"}
-          </span>
+        <section className="hero-banner" data-animate data-delay="0">
+          <div className="hero-deco" aria-hidden="true" />
+          <div className="hero-badge">
+            <span className="hero-badge-dot" aria-hidden="true" />
+            {roleLabel}
+          </div>
+          <h1 className="hero-title">
+            Selamat Datang Kembali, {currentUser?.name ?? "—"}!
+          </h1>
+          <p className="hero-subtitle">
+            Pantau aktivitas sistem SPMB secara real-time dari sini.
+          </p>
+        </section>
+
+        <div className="stats-grid" data-animate data-delay="50">
+          <div className="stat-card" data-animate data-delay="0">
+            <div className="stat-icon-wrap">
+              <Users size={20} strokeWidth={2} />
+            </div>
+            <div className={`stat-value${pulse ? " pulse" : ""}`}>
+              {displayStats.totalUsers}
+            </div>
+            <div className="stat-label">Total Pengguna</div>
+          </div>
+
+          <div className="stat-card" data-animate data-delay="100">
+            <div className="stat-icon-wrap">
+              <LogIn size={20} strokeWidth={2} />
+            </div>
+            <div className={`stat-value${pulse ? " pulse" : ""}`}>
+              {displayStats.totalLogins}
+            </div>
+            <div className="stat-label">Login Hari Ini</div>
+          </div>
+
+          <div className="stat-card" data-animate data-delay="200">
+            <div className="stat-icon-wrap">
+              <CheckCircle size={20} strokeWidth={2} />
+            </div>
+            <div className={`stat-value${pulse ? " pulse" : ""}`}>
+              {displayStats.successRate}%
+            </div>
+            <div className="stat-label">Keberhasilan</div>
+          </div>
+
+          <div className="stat-card danger" data-animate data-delay="300">
+            <div className="stat-icon-wrap">
+              <XCircle size={20} strokeWidth={2} />
+            </div>
+            <div className={`stat-value${pulse ? " pulse" : ""}`}>
+              {displayStats.failedLogins}
+            </div>
+            <div className="stat-label">Gagal</div>
+          </div>
         </div>
 
-        {/* Stats */}
-        {stats && (
-          <div className="stats-grid">
-            <div className="stat-card brown">
-              <div className="stat-icon brown">👥</div>
-              <div className={`stat-value${pulse ? " pulse" : ""}`}>{stats.totalUsers}</div>
-              <div className="stat-label">Total Pendaftar</div>
-            </div>
-            <div className="stat-card blush">
-              <div className="stat-icon blush">🔐</div>
-              <div className={`stat-value${pulse ? " pulse" : ""}`}>{stats.totalLogins}</div>
-              <div className="stat-label">Total Lunas</div>
-            </div>
-            <div className="stat-card sage">
-              <div className="stat-icon sage">✅</div>
-              <div className={`stat-value${pulse ? " pulse" : ""}`}>{stats.successRate}%</div>
-              <div className="stat-label">Tingkat Kelolosan</div>
-            </div>
-            <div className="stat-card lavender">
-              <div className="stat-icon lavender">⚠️</div>
-              <div className={`stat-value${pulse ? " pulse" : ""}`}>{stats.failedLogins}</div>
-              <div className="stat-label">Telat Membayar/Tidak lulus</div>
-            </div>
-          </div>
-        )}
-
-        {/* Real-time history */}
-        <div className="panel">
+        <section className="panel" data-animate data-delay="100">
           <div className="panel-header">
             <h3>Histori Login Terkini</h3>
-            <div className="live-indicator">
-              <div className="live-dot"/>
-              Live · diperbarui {lastUpdated.toLocaleTimeString("id-ID")}
-            </div>
+            <span className="live-badge">
+              <span className="live-dot" aria-hidden="true" />
+              LIVE · {lastUpdated.toLocaleTimeString("id-ID")}
+            </span>
           </div>
 
           {loading ? (
-            <div className="loading-state">
-              <div className="spinner"/>
+            <div className="loading-state" data-animate data-delay="0">
+              <div className="spinner" />
               Memuat data...
             </div>
           ) : history.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-icon">📋</div>
-              <p>Belum ada histori login.</p>
+            <div className="empty-state" data-animate data-delay="0">
+              Belum ada histori login.
             </div>
           ) : (
             <>
@@ -342,36 +597,73 @@ export default function DashboardPage() {
                 <thead>
                   <tr>
                     <th>Pengguna</th>
-                    <th>Status</th>
-                    <th>IP Address</th>
+                    <th>Alamat IP</th>
                     <th>Browser</th>
                     <th>Waktu</th>
+                    <th>Status</th>
+                    <th>Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {history.slice(0, 15).map((entry, idx) => (
-                    <tr key={entry.id} className={idx === 0 && pulse ? "new-row" : ""}>
-                      <td>
-                        <div className="email-cell">{entry.name !== "-" ? entry.name : entry.email}</div>
-                        <div style={{ fontSize: "11.5px", color: "var(--text-light)", marginTop: "2px" }}>
-                          {entry.email}
-                        </div>
-                      </td>
-                      <td>
-                        <span className={`status-badge ${entry.status}`}>
-                          {entry.status === "success" ? "✓ Berhasil" : "✗ Gagal"}
-                        </span>
-                        {entry.reason && (
-                          <div style={{ fontSize: "11px", color: "#E74C3C", marginTop: "3px" }}>
-                            {entry.reason}
+                  {history.slice(0, 15).map((entry, idx) => {
+                    const name = displayName(entry);
+                    const colors = avatarColor(name);
+                    const initial = name.charAt(0).toUpperCase();
+                    return (
+                      <tr
+                        key={entry.id}
+                        className={idx === 0 && pulse ? "new-row" : ""}
+                        data-animate
+                        data-delay={String(150 + idx * 50)}
+                      >
+                        <td>
+                          <div className="user-cell">
+                            <div
+                              className="row-avatar"
+                              style={{
+                                background: colors.bg,
+                                color: colors.color,
+                              }}
+                            >
+                              {initial}
+                            </div>
+                            <div>
+                              <div className="user-name">{name}</div>
+                              <div className="user-email">{entry.email}</div>
+                            </div>
                           </div>
-                        )}
-                      </td>
-                      <td><span className="ip-cell">{entry.ip}</span></td>
-                      <td>{getBrowser(entry.userAgent)}</td>
-                      <td className="time-cell">{timeAgo(entry.timestamp)}</td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td>
+                          <span className="ip-cell">{entry.ip}</span>
+                        </td>
+                        <td>{getBrowser(entry.userAgent)}</td>
+                        <td className="time-cell">
+                          {timeAgo(entry.timestamp)}
+                        </td>
+                        <td>
+                          <span
+                            className={`status-badge ${entry.status === "success" ? "success" : "failed"}`}
+                          >
+                            {entry.status === "success"
+                              ? "BERHASIL"
+                              : "GAGAL"}
+                          </span>
+                          {entry.reason && (
+                            <div className="fail-reason">{entry.reason}</div>
+                          )}
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="aksi-btn"
+                            aria-label={`Detail login ${name}`}
+                          >
+                            <Eye size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
               <div className="updated-label">
@@ -379,7 +671,7 @@ export default function DashboardPage() {
               </div>
             </>
           )}
-        </div>
+        </section>
       </div>
     </>
   );
