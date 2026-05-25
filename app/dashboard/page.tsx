@@ -1,416 +1,384 @@
-"use client";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+// ============================================================
+// STATUS : 🆕 BARU
+// PATH   : app/dashboard/page.tsx
+// ISI    : Halaman beranda dashboard
+//          - Welcome banner (greeting pagi/siang/malam)
+//          - 4 stat card: total user, total login, success rate, gagal
+//          - Tabel histori login terkini (15 baris)
+//          - Polling real-time setiap 15 detik + animasi pulse saat update
+// ============================================================
 
-interface User { id: string; name: string; email: string; role: string; }
-interface LogEntry {
-  id: string;
-  name: string;
-  email: string;
-  status: "success" | "failed";
-  ip: string;
-  timestamp: string;
-  reason?: string;
+"use client";
+import { useState, useEffect, useCallback } from "react";
+
+interface User {
+  id: string; name: string; email: string; role: string;
+}
+interface LoginEntry {
+  id: string; userId: string; email: string; name: string;
+  status: "success" | "failed"; ip: string; userAgent: string;
+  timestamp: string; reason?: string;
+}
+interface StatsData {
+  totalUsers: number;
+  totalLogins: number;
+  failedLogins: number;
+  successRate: number;
 }
 
-const MENU = [
-  { key: "dashboard", icon: "🏠", label: "Dashboard" },
-  { key: "berkas",    icon: "📂", label: "Berkas" },
-  { key: "ujian",     icon: "📝", label: "Ujian" },
-  { key: "pengumuman",icon: "📣", label: "Pengumuman" },
-  { key: "riwayat",   icon: "🕐", label: "Riwayat Login" },
-];
-
 export default function DashboardPage() {
-  const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [active, setActive] = useState("dashboard");
-  const [history, setHistory] = useState<LogEntry[]>([]);
-  const [sideOpen, setSideOpen] = useState(true);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [history, setHistory] = useState<LoginEntry[]>([]);
+  const [stats, setStats] = useState<StatsData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [pulse, setPulse] = useState(false);
 
-  useEffect(() => {
-    fetch("/api/auth/me").then(r => {
-      if (!r.ok) { router.push("/login"); return; }
-      return r.json();
-    }).then(d => d && setUser(d.user));
-  }, [router]);
-
-  useEffect(() => {
-    if (active === "riwayat") {
-      fetch("/api/auth/history").then(r => r.json()).then(d => setHistory(d.history || []));
+  const fetchAll = useCallback(async () => {
+    try {
+      const [meRes, histRes] = await Promise.all([
+        fetch("/api/auth/me"),
+        fetch("/api/admin/history"),
+      ]);
+      if (meRes.ok) {
+        const d = await meRes.json();
+        setCurrentUser(d.user);
+      }
+      if (histRes.ok) {
+        const d = await histRes.json();
+        const h: LoginEntry[] = d.history ?? [];
+        setHistory(h);
+        const total = h.length;
+        const failed = h.filter((e) => e.status === "failed").length;
+        const success = total - failed;
+        setStats({
+          totalUsers: d.totalUsers ?? 1,
+          totalLogins: total,
+          failedLogins: failed,
+          successRate: total > 0 ? Math.round((success / total) * 100) : 100,
+        });
+        // Pulse animation on update
+        setPulse(true);
+        setTimeout(() => setPulse(false), 600);
+        setLastUpdated(new Date());
+      }
+    } finally {
+      setLoading(false);
     }
-  }, [active]);
+  }, []);
 
-  async function handleLogout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
+  useEffect(() => {
+    fetchAll();
+    const interval = setInterval(fetchAll, 15000); // real-time every 15s
+    return () => clearInterval(interval);
+  }, [fetchAll]);
+
+  function timeAgo(ts: string) {
+    const diff = Date.now() - new Date(ts).getTime();
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return "baru saja";
+    if (m < 60) return `${m} mnt lalu`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h} jam lalu`;
+    return `${Math.floor(h / 24)} hari lalu`;
   }
 
-  if (!user) return (
-    <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:"100vh", background:"#FDF6EE", fontFamily:"DM Sans, sans-serif", color:"#8B6B52" }}>
-      Memuat...
-    </div>
-  );
+  function getBrowser(ua: string) {
+    if (ua.includes("Firefox")) return "Firefox";
+    if (ua.includes("Edg")) return "Edge";
+    if (ua.includes("Chrome")) return "Chrome";
+    if (ua.includes("Safari")) return "Safari";
+    return "Browser";
+  }
 
-  const now = new Date();
-  const greeting = now.getHours() < 12 ? "Selamat Pagi" : now.getHours() < 17 ? "Selamat Siang" : "Selamat Malam";
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Selamat pagi" : hour < 17 ? "Selamat siang" : "Selamat malam";
 
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=DM+Sans:wght@300;400;500;600&display=swap');
-        * { box-sizing:border-box; margin:0; padding:0; }
         :root {
-          --cream:       #FDF6EE;
-          --cream-dark:  #F5EAD8;
-          --blush:       #F2C4C4;
-          --blush-light: #FAE8E8;
-          --sage:        #C8DDD1;
-          --lavender:    #DDD2EE;
-          --peach:       #F9D8C0;
-          --warm-brown:  #8B6B52;
-          --text-dark:   #3D2B1F;
-          --text-mid:    #7A5C48;
-          --text-light:  #B89A86;
-          --white:       #FFFFFF;
-          --shadow:      rgba(139,107,82,0.12);
+          --cream: #FDF6EE; --cream-dark: #F5EAD8; --blush: #F2C4C4;
+          --blush-light: #FAE8E8; --sage: #C8DDD1; --lavender: #DDD2EE;
+          --warm-brown: #8B6B52; --text-dark: #3D2B1F; --text-mid: #7A5C48;
+          --text-light: #B89A86; --white: #FFFFFF;
         }
-        body { font-family:'DM Sans',sans-serif; background:var(--cream); color:var(--text-dark); }
+        .page { display: flex; flex-direction: column; gap: 24px; }
 
-        /* ── Layout ── */
-        .layout { display:flex; height:100vh; overflow:hidden; }
-
-        /* ── Sidebar ── */
-        .sidebar {
-          width: ${sideOpen ? "240px" : "72px"};
-          background: var(--white);
-          border-right: 1px solid var(--cream-dark);
-          display:flex; flex-direction:column;
-          transition: width .3s cubic-bezier(.22,1,.36,1);
-          overflow:hidden;
-          flex-shrink:0;
-          box-shadow: 2px 0 16px var(--shadow);
-          position:relative; z-index:10;
+        /* Welcome banner */
+        .welcome-banner {
+          background: linear-gradient(135deg, var(--warm-brown) 0%, #A0785A 50%, #C49A7A 100%);
+          border-radius: 20px; padding: 28px 32px;
+          color: white; position: relative; overflow: hidden;
         }
-
-        .sidebar-header {
-          padding: 24px 18px 16px;
-          border-bottom: 1px solid var(--cream-dark);
-          display:flex; align-items:center; gap:12px;
-          white-space:nowrap;
+        .welcome-banner::before {
+          content: '🎓';
+          position: absolute; right: 28px; top: 50%;
+          transform: translateY(-50%);
+          font-size: 72px; opacity: 0.15;
         }
-        .sidebar-logo {
-          width:36px; height:36px; flex-shrink:0;
-          background:linear-gradient(135deg, var(--blush-light), var(--cream-dark));
-          border-radius:10px; display:flex; align-items:center; justify-content:center;
-          font-size:18px; border:1px solid var(--blush);
+        .welcome-banner h2 {
+          font-family: 'Playfair Display', serif;
+          font-size: 22px; font-weight: 600; margin-bottom: 6px;
         }
-        .sidebar-title {
-          font-family:'Playfair Display',serif;
-          font-size:15px; font-weight:600;
-          color:var(--text-dark);
+        .welcome-banner p { font-size: 13.5px; opacity: 0.85; }
+        .role-badge {
+          display: inline-block; margin-top: 12px;
+          background: rgba(255,255,255,0.2); padding: 4px 12px;
+          border-radius: 20px; font-size: 12px; font-weight: 500;
+          backdrop-filter: blur(4px);
         }
 
-        nav { flex:1; padding:16px 10px; display:flex; flex-direction:column; gap:4px; }
-        .nav-item {
-          display:flex; align-items:center; gap:12px;
-          padding:11px 12px; border-radius:12px;
-          cursor:pointer; white-space:nowrap;
-          transition: background .15s, color .15s;
-          color:var(--text-mid); font-size:14px; font-weight:400;
-          border:none; background:transparent; width:100%; text-align:left;
+        /* Stats */
+        .stats-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+          gap: 16px;
         }
-        .nav-item:hover { background:var(--cream); color:var(--text-dark); }
-        .nav-item.active {
-          background:linear-gradient(135deg, var(--blush-light), var(--lavender));
-          color:var(--warm-brown); font-weight:500;
-        }
-        .nav-icon { font-size:18px; flex-shrink:0; }
-
-        .sidebar-footer {
-          padding:14px 10px;
-          border-top:1px solid var(--cream-dark);
-          white-space:nowrap;
-        }
-        .user-card {
-          display:flex; align-items:center; gap:10px;
-          padding:10px 12px; border-radius:12px;
-          background:var(--cream);
-        }
-        .user-avatar {
-          width:32px; height:32px; border-radius:50%; flex-shrink:0;
-          background:linear-gradient(135deg, var(--blush), var(--lavender));
-          display:flex; align-items:center; justify-content:center;
-          font-size:13px; font-weight:600; color:var(--warm-brown);
-        }
-        .user-info { overflow:hidden; }
-        .user-name { font-size:13px; font-weight:500; color:var(--text-dark); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-        .user-role { font-size:11px; color:var(--text-light); }
-
-        /* ── Main ── */
-        .main { flex:1; overflow-y:auto; display:flex; flex-direction:column; }
-
-        /* ── Topbar ── */
-        .topbar {
-          position:sticky; top:0; z-index:5;
-          background:rgba(253,246,238,0.9);
-          backdrop-filter:blur(12px);
-          border-bottom:1px solid var(--cream-dark);
-          padding:0 28px;
-          height:64px;
-          display:flex; align-items:center; justify-content:space-between;
-        }
-        .topbar-left { display:flex; align-items:center; gap:14px; }
-        .toggle-btn {
-          background:none; border:none; cursor:pointer;
-          padding:8px; border-radius:8px; color:var(--text-mid);
-          font-size:20px; transition:background .15s;
-          display:flex; align-items:center;
-        }
-        .toggle-btn:hover { background:var(--cream-dark); }
-        .page-title { font-family:'Playfair Display',serif; font-size:18px; color:var(--text-dark); }
-
-        .topbar-right { display:flex; align-items:center; gap:12px; }
-        .badge {
-          background:var(--blush-light);
-          color:var(--warm-brown);
-          padding:4px 12px; border-radius:20px;
-          font-size:12px; font-weight:500;
-          border:1px solid var(--blush);
-        }
-        .logout-btn {
-          background:none; border:1.5px solid var(--cream-dark);
-          border-radius:10px; padding:7px 14px;
-          font-family:'DM Sans',sans-serif; font-size:13px;
-          color:var(--text-mid); cursor:pointer;
-          transition:all .15s;
-        }
-        .logout-btn:hover { border-color:var(--blush); color:var(--warm-brown); background:var(--blush-light); }
-
-        /* ── Content ── */
-        .content { padding:28px; flex:1; }
-
-        /* ── Greeting ── */
-        .greeting { margin-bottom:28px; }
-        .greeting h2 { font-family:'Playfair Display',serif; font-size:26px; color:var(--text-dark); margin-bottom:4px; }
-        .greeting p { font-size:14px; color:var(--text-light); }
-
-        /* ── Stats Grid ── */
-        .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:16px; margin-bottom:28px; }
         .stat-card {
-          background:var(--white);
-          border-radius:18px;
-          padding:22px 20px;
-          box-shadow:0 2px 12px var(--shadow);
-          border:1px solid var(--cream-dark);
-          display:flex; flex-direction:column; gap:12px;
-          transition:transform .2s, box-shadow .2s;
+          background: var(--white); border-radius: 16px;
+          padding: 20px; border: 1px solid var(--cream-dark);
+          transition: transform .2s, box-shadow .2s;
+          position: relative; overflow: hidden;
         }
-        .stat-card:hover { transform:translateY(-2px); box-shadow:0 6px 24px var(--shadow); }
-        .stat-icon { font-size:28px; }
-        .stat-num { font-family:'Playfair Display',serif; font-size:32px; color:var(--text-dark); line-height:1; }
-        .stat-label { font-size:12.5px; color:var(--text-light); font-weight:500; }
-        .stat-card:nth-child(1) .stat-icon { background:var(--blush-light); width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center; }
-        .stat-card:nth-child(2) .stat-icon { background:var(--sage); width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center; }
-        .stat-card:nth-child(3) .stat-icon { background:var(--lavender); width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center; }
-        .stat-card:nth-child(4) .stat-icon { background:var(--peach); width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center; }
+        .stat-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 20px rgba(139,107,82,0.12);
+        }
+        .stat-card::before {
+          content: ''; position: absolute;
+          bottom: 0; left: 0; right: 0; height: 3px;
+        }
+        .stat-card.brown::before { background: linear-gradient(90deg, var(--warm-brown), #C49A7A); }
+        .stat-card.blush::before { background: linear-gradient(90deg, var(--blush), #F9A8A8); }
+        .stat-card.sage::before { background: linear-gradient(90deg, var(--sage), #A8CCBA); }
+        .stat-card.lavender::before { background: linear-gradient(90deg, var(--lavender), #C4B4E4); }
+        .stat-icon {
+          width: 40px; height: 40px; border-radius: 10px;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 18px; margin-bottom: 12px;
+        }
+        .stat-icon.brown { background: var(--cream-dark); }
+        .stat-icon.blush { background: var(--blush-light); }
+        .stat-icon.sage { background: #EAF4EF; }
+        .stat-icon.lavender { background: #F0ECFB; }
+        .stat-value {
+          font-size: 28px; font-weight: 700; color: var(--text-dark);
+          font-family: 'Playfair Display', serif;
+          transition: all .3s;
+        }
+        .stat-value.pulse { animation: statPulse .4s ease; }
+        @keyframes statPulse {
+          0%,100% { transform: scale(1); }
+          50% { transform: scale(1.08); }
+        }
+        .stat-label {
+          font-size: 12px; color: var(--text-light);
+          margin-top: 4px; text-transform: uppercase;
+          letter-spacing: 0.4px; font-weight: 500;
+        }
 
-        /* ── Panel ── */
+        /* History panel */
         .panel {
-          background:var(--white);
-          border-radius:18px;
-          border:1px solid var(--cream-dark);
-          box-shadow:0 2px 12px var(--shadow);
-          overflow:hidden;
+          background: var(--white); border-radius: 20px;
+          border: 1px solid var(--cream-dark); overflow: hidden;
         }
         .panel-header {
-          padding:18px 22px;
-          border-bottom:1px solid var(--cream-dark);
-          display:flex; align-items:center; justify-content:space-between;
+          padding: 18px 22px; border-bottom: 1px solid var(--cream-dark);
+          display: flex; align-items: center; justify-content: space-between;
         }
-        .panel-title { font-size:14px; font-weight:600; color:var(--text-dark); }
+        .panel-header h3 {
+          font-family: 'Playfair Display', serif;
+          font-size: 16px; color: var(--text-dark); font-weight: 600;
+        }
+        .live-indicator {
+          display: flex; align-items: center; gap: 6px;
+          font-size: 11.5px; color: var(--text-light); font-weight: 500;
+        }
+        .live-dot {
+          width: 7px; height: 7px; border-radius: 50%;
+          background: #2ECC71; animation: livePulse 2s infinite;
+        }
+        @keyframes livePulse {
+          0%,100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.5; transform: scale(0.8); }
+        }
 
-        /* ── Table ── */
-        table { width:100%; border-collapse:collapse; }
-        th { padding:12px 20px; font-size:11.5px; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-light); font-weight:500; text-align:left; background:var(--cream); }
-        td { padding:13px 20px; font-size:13.5px; color:var(--text-mid); border-top:1px solid var(--cream-dark); }
-        tr:hover td { background:rgba(253,246,238,0.6); }
+        /* History table */
+        .history-table { width: 100%; border-collapse: collapse; }
+        .history-table th {
+          text-align: left; padding: 10px 22px;
+          font-size: 11px; text-transform: uppercase;
+          letter-spacing: 0.5px; color: var(--text-light);
+          background: var(--cream); font-weight: 600;
+          border-bottom: 1px solid var(--cream-dark);
+        }
+        .history-table td {
+          padding: 13px 22px; border-bottom: 1px solid var(--cream-dark);
+          font-size: 13.5px; color: var(--text-mid);
+          vertical-align: middle;
+        }
+        .history-table tr:last-child td { border-bottom: none; }
+        .history-table tr { transition: background .15s; }
+        .history-table tr:hover td { background: var(--cream); }
+        .history-table tr.new-row td {
+          animation: rowSlide .4s ease;
+        }
+        @keyframes rowSlide {
+          from { background: #EDFBF2; }
+          to { background: transparent; }
+        }
 
         .status-badge {
-          display:inline-flex; align-items:center; gap:5px;
-          padding:3px 10px; border-radius:20px;
-          font-size:11.5px; font-weight:500;
+          display: inline-flex; align-items: center; gap: 5px;
+          padding: 3px 10px; border-radius: 20px;
+          font-size: 11.5px; font-weight: 600;
         }
-        .status-success { background:#E8F5E9; color:#2E7D32; }
-        .status-failed  { background:#FFEBEE; color:#C62828; }
-
-        /* ── Empty state ── */
-        .empty { text-align:center; padding:48px 20px; color:var(--text-light); font-size:14px; }
-        .empty span { font-size:36px; display:block; margin-bottom:12px; }
-
-        /* ── Coming Soon ── */
-        .coming-soon {
-          display:flex; flex-direction:column; align-items:center; justify-content:center;
-          height:300px; gap:12px; color:var(--text-light);
+        .status-badge.success {
+          background: #EDFBF2; color: #27AE60;
         }
-        .coming-soon span { font-size:48px; }
-        .coming-soon h3 { font-family:'Playfair Display',serif; font-size:20px; color:var(--text-mid); }
-        .coming-soon p { font-size:13px; }
+        .status-badge.failed {
+          background: #FFF0F0; color: #E74C3C;
+        }
+        .email-cell { font-weight: 500; color: var(--text-dark); }
+        .ip-cell {
+          font-family: monospace; font-size: 12px;
+          background: var(--cream); padding: 2px 7px;
+          border-radius: 5px; display: inline-block;
+        }
+        .time-cell { color: var(--text-light); font-size: 12.5px; }
 
-        /* ── Flowchart placeholder ── */
-        .flow-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:0; }
+        .loading-state {
+          text-align: center; padding: 48px;
+          color: var(--text-light); font-size: 13px;
+        }
+        .loading-state .spinner {
+          width: 28px; height: 28px; border: 3px solid var(--cream-dark);
+          border-top-color: var(--warm-brown); border-radius: 50%;
+          animation: spin 0.8s linear infinite; margin: 0 auto 12px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
-        @media(max-width:640px) {
-          .stats-grid { grid-template-columns:1fr 1fr; }
-          .flow-grid  { grid-template-columns:1fr; }
-          .topbar { padding:0 16px; }
-          .content { padding:16px; }
+        .empty-state {
+          text-align: center; padding: 48px;
+          color: var(--text-light);
+        }
+        .empty-state .empty-icon { font-size: 32px; margin-bottom: 10px; }
+        .empty-state p { font-size: 13px; }
+
+        .updated-label {
+          font-size: 11px; color: var(--text-light);
+          text-align: right; padding: 10px 22px;
+        }
+
+        @media (max-width: 640px) {
+          .stats-grid { grid-template-columns: 1fr 1fr; }
+          .history-table th:nth-child(3),
+          .history-table td:nth-child(3),
+          .history-table th:nth-child(4),
+          .history-table td:nth-child(4) { display: none; }
         }
       `}</style>
 
-      <div className="layout">
-        {/* ── Sidebar ── */}
-        <aside className="sidebar">
-          <div className="sidebar-header">
-            <div className="sidebar-logo">🎓</div>
-            {sideOpen && <span className="sidebar-title">SPMB System</span>}
-          </div>
-          <nav>
-            {MENU.map(m => (
-              <button key={m.key} className={`nav-item ${active === m.key ? "active" : ""}`} onClick={() => setActive(m.key)}>
-                <span className="nav-icon">{m.icon}</span>
-                {sideOpen && m.label}
-              </button>
-            ))}
-          </nav>
-          <div className="sidebar-footer">
-            <div className="user-card">
-              <div className="user-avatar">{user.name[0]}</div>
-              {sideOpen && (
-                <div className="user-info">
-                  <div className="user-name">{user.name}</div>
-                  <div className="user-role">{user.role}</div>
-                </div>
-              )}
+      <div className="page">
+        {/* Welcome */}
+        <div className="welcome-banner">
+          <h2>{greeting}, {currentUser?.name ?? "—"} 👋</h2>
+          <p>Pantau aktivitas sistem SPMB secara real-time dari sini.</p>
+          <span className="role-badge">
+            {currentUser?.role === "admin" ? "🛡️ Administrator" : "👤 Pengguna"}
+          </span>
+        </div>
+
+        {/* Stats */}
+        {stats && (
+          <div className="stats-grid">
+            <div className="stat-card brown">
+              <div className="stat-icon brown">👥</div>
+              <div className={`stat-value${pulse ? " pulse" : ""}`}>{stats.totalUsers}</div>
+              <div className="stat-label">Total Pendaftar</div>
+            </div>
+            <div className="stat-card blush">
+              <div className="stat-icon blush">🔐</div>
+              <div className={`stat-value${pulse ? " pulse" : ""}`}>{stats.totalLogins}</div>
+              <div className="stat-label">Total Lunas</div>
+            </div>
+            <div className="stat-card sage">
+              <div className="stat-icon sage">✅</div>
+              <div className={`stat-value${pulse ? " pulse" : ""}`}>{stats.successRate}%</div>
+              <div className="stat-label">Tingkat Kelolosan</div>
+            </div>
+            <div className="stat-card lavender">
+              <div className="stat-icon lavender">⚠️</div>
+              <div className={`stat-value${pulse ? " pulse" : ""}`}>{stats.failedLogins}</div>
+              <div className="stat-label">Telat Membayar/Tidak lulus</div>
             </div>
           </div>
-        </aside>
+        )}
 
-        {/* ── Main ── */}
-        <div className="main">
-          {/* Topbar */}
-          <header className="topbar">
-            <div className="topbar-left">
-              <button className="toggle-btn" onClick={() => setSideOpen(!sideOpen)}>☰</button>
-              <span className="page-title">{MENU.find(m => m.key === active)?.label}</span>
+        {/* Real-time history */}
+        <div className="panel">
+          <div className="panel-header">
+            <h3>Histori Login Terkini</h3>
+            <div className="live-indicator">
+              <div className="live-dot"/>
+              Live · diperbarui {lastUpdated.toLocaleTimeString("id-ID")}
             </div>
-            <div className="topbar-right">
-              <span className="badge">🟢 Online</span>
-              <button className="logout-btn" onClick={handleLogout}>Keluar →</button>
+          </div>
+
+          {loading ? (
+            <div className="loading-state">
+              <div className="spinner"/>
+              Memuat data...
             </div>
-          </header>
-
-          {/* Content */}
-          <div className="content">
-
-            {/* ── DASHBOARD ── */}
-            {active === "dashboard" && (
-              <>
-                <div className="greeting">
-                  <h2>{greeting}, {user.name.split(" ")[0]}! 👋</h2>
-                  <p>Selamat datang kembali di SPMB Dashboard. Berikut ringkasan hari ini.</p>
-                </div>
-
-                <div className="stats-grid">
-                  {[
-                    { icon:"👥", num:"1,284", label:"Total Pendaftar" },
-                    { icon:"✅", num:"896",   label:"Berkas Lengkap" },
-                    { icon:"📝", num:"432",   label:"Peserta Ujian" },
-                    { icon:"🏆", num:"128",   label:"Diterima" },
-                  ].map((s,i) => (
-                    <div className="stat-card" key={i}>
-                      <div className="stat-icon">{s.icon}</div>
-                      <div className="stat-num">{s.num}</div>
-                      <div className="stat-label">{s.label}</div>
-                    </div>
+          ) : history.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-icon">📋</div>
+              <p>Belum ada histori login.</p>
+            </div>
+          ) : (
+            <>
+              <table className="history-table">
+                <thead>
+                  <tr>
+                    <th>Pengguna</th>
+                    <th>Status</th>
+                    <th>IP Address</th>
+                    <th>Browser</th>
+                    <th>Waktu</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {history.slice(0, 15).map((entry, idx) => (
+                    <tr key={entry.id} className={idx === 0 && pulse ? "new-row" : ""}>
+                      <td>
+                        <div className="email-cell">{entry.name !== "-" ? entry.name : entry.email}</div>
+                        <div style={{ fontSize: "11.5px", color: "var(--text-light)", marginTop: "2px" }}>
+                          {entry.email}
+                        </div>
+                      </td>
+                      <td>
+                        <span className={`status-badge ${entry.status}`}>
+                          {entry.status === "success" ? "✓ Berhasil" : "✗ Gagal"}
+                        </span>
+                        {entry.reason && (
+                          <div style={{ fontSize: "11px", color: "#E74C3C", marginTop: "3px" }}>
+                            {entry.reason}
+                          </div>
+                        )}
+                      </td>
+                      <td><span className="ip-cell">{entry.ip}</span></td>
+                      <td>{getBrowser(entry.userAgent)}</td>
+                      <td className="time-cell">{timeAgo(entry.timestamp)}</td>
+                    </tr>
                   ))}
-                </div>
-
-                <div className="panel">
-                  <div className="panel-header">
-                    <span className="panel-title">📋 Aktivitas Terakhir</span>
-                    <span style={{fontSize:"12px",color:"var(--text-light)"}}>Hari ini</span>
-                  </div>
-                  <table>
-                    <thead>
-                      <tr><th>Waktu</th><th>Aktivitas</th><th>Status</th></tr>
-                    </thead>
-                    <tbody>
-                      {[
-                        ["09:12","Pendaftar baru masuk","✅ Sukses"],
-                        ["09:05","Berkas Andi Pratama diverifikasi","✅ Sukses"],
-                        ["08:47","Pengumuman ujian diterbitkan","✅ Sukses"],
-                        ["08:30","Backup database otomatis","✅ Sukses"],
-                      ].map(([t,a,s],i) => (
-                        <tr key={i}>
-                          <td style={{color:"var(--text-light)",fontSize:"12.5px"}}>{t}</td>
-                          <td>{a}</td>
-                          <td>{s}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
-            )}
-
-            {/* ── RIWAYAT LOGIN ── */}
-            {active === "riwayat" && (
-              <div className="panel">
-                <div className="panel-header">
-                  <span className="panel-title">🕐 Riwayat Login (20 Terbaru)</span>
-                </div>
-                {history.length === 0 ? (
-                  <div className="empty"><span>📭</span>Belum ada riwayat login.</div>
-                ) : (
-                  <div style={{overflowX:"auto"}}>
-                    <table>
-                      <thead>
-                        <tr><th>Waktu</th><th>Nama</th><th>Email</th><th>Status</th><th>IP</th></tr>
-                      </thead>
-                      <tbody>
-                        {history.map(h => (
-                          <tr key={h.id}>
-                            <td style={{fontSize:"12px",color:"var(--text-light)"}}>
-                              {new Date(h.timestamp).toLocaleString("id-ID")}
-                            </td>
-                            <td>{h.name === "-" ? <span style={{color:"var(--text-light)"}}>—</span> : h.name}</td>
-                            <td style={{fontSize:"12.5px"}}>{h.email}</td>
-                            <td>
-                              <span className={`status-badge ${h.status === "success" ? "status-success" : "status-failed"}`}>
-                                {h.status === "success" ? "✓ Berhasil" : `✗ Gagal${h.reason ? ` · ${h.reason}` : ""}`}
-                              </span>
-                            </td>
-                            <td style={{fontFamily:"monospace",fontSize:"12px"}}>{h.ip}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+                </tbody>
+              </table>
+              <div className="updated-label">
+                Memperbarui otomatis setiap 15 detik
               </div>
-            )}
-
-            {/* ── Coming Soon pages ── */}
-            {["berkas","ujian","pengumuman"].includes(active) && (
-              <div className="coming-soon">
-                <span>{MENU.find(m=>m.key===active)?.icon}</span>
-                <h3>Menu {MENU.find(m=>m.key===active)?.label}</h3>
-                <p>Fitur ini sedang dalam pengembangan 🚧</p>
-              </div>
-            )}
-
-          </div>
+            </>
+          )}
         </div>
       </div>
     </>

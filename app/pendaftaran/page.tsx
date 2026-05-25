@@ -1,3 +1,5 @@
+"use client";
+
 // ============================================================
 // PATH   : app/page.tsx
 // ISI    : Landing Page SPMB SMK Citra Negara
