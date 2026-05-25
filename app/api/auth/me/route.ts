@@ -1,15 +1,41 @@
-import { NextRequest, NextResponse } from "next/server";
-import { verifyToken, getUserByEmail } from "@/lib/auth";
+// ============================================================
+// PATH : app/api/auth/me/route.ts
+// ISI  : GET → kembalikan data user dari session Supabase + join profiles
+// ============================================================
 
-export async function GET(req: NextRequest) {
-  const token = req.cookies.get("auth_token")?.value;
-  if (!token) return NextResponse.json({ user: null }, { status: 401 });
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 
-  const payload = verifyToken(token);
-  if (!payload) return NextResponse.json({ user: null }, { status: 401 });
+export async function GET() {
+  const supabase = await createClient();
 
-  const user = getUserByEmail(payload.email);
-  if (!user) return NextResponse.json({ user: null }, { status: 401 });
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
 
-  return NextResponse.json({ user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+  if (error || !user) {
+    return NextResponse.json({ user: null }, { status: 401 });
+  }
+
+  // Ambil profil lengkap
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name, role, created_at")
+    .eq("id", user.id)
+    .single();
+
+  if (!profile) {
+    return NextResponse.json({ user: null }, { status: 401 });
+  }
+
+  return NextResponse.json({
+    user: {
+      id: user.id,
+      name: profile.full_name,
+      email: user.email ?? "",
+      role: profile.role as "admin" | "user",
+      createdAt: profile.created_at,
+    },
+  });
 }

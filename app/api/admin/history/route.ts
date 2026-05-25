@@ -1,7 +1,7 @@
 // ============================================================
-// PATH : app/api/auth/history/route.ts
-// ISI  : GET → histori login (20 terbaru), admin only
-//        Baca dari tabel login_history JOIN profiles
+// PATH : app/api/admin/history/route.ts
+// ISI  : GET → histori login (50 terbaru) + totalUsers
+//        Admin only — baca dari login_history JOIN profiles
 // ============================================================
 
 import { NextResponse } from "next/server";
@@ -31,8 +31,8 @@ export async function GET() {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  // Ambil 20 histori login terbaru + join profiles untuk email & nama
-  const { data: rows, error } = await supabase
+  // Ambil 50 histori login terbaru + join profiles untuk email & nama
+  const { data: rows, error: historyError } = await supabase
     .from("login_history")
     .select(
       `
@@ -49,12 +49,17 @@ export async function GET() {
     `
     )
     .order("created_at", { ascending: false })
-    .limit(20);
+    .limit(50);
 
-  if (error) {
-    console.error("[auth/history] Query error:", error.message);
+  if (historyError) {
+    console.error("[admin/history] Query error:", historyError.message);
     return NextResponse.json({ error: "Gagal mengambil histori." }, { status: 500 });
   }
+
+  // Hitung total user aktif dari tabel profiles
+  const { count: totalUsers } = await supabase
+    .from("profiles")
+    .select("id", { count: "exact", head: true });
 
   // Map ke format response yang sama dengan sebelumnya
   const history: LoginEntry[] = (rows ?? []).map((row) => {
@@ -64,12 +69,12 @@ export async function GET() {
       userId: row.user_id ?? "-",
       email: p?.email ?? "-",
       name: p?.full_name ?? "-",
-      status: row.status as "success" | "failed",
+      status: row.status === "berhasil" ? "success" : "failed",
       ip: row.ip_address,
       userAgent: row.user_agent,
       timestamp: row.created_at,
     };
   });
 
-  return NextResponse.json({ history });
+  return NextResponse.json({ history, totalUsers: totalUsers ?? 0 });
 }

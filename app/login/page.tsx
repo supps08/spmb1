@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
@@ -9,6 +9,12 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
+
+  // Autocomplete email dari localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("spmb_last_email");
+    if (saved) setEmail(saved);
+  }, []);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -24,6 +30,8 @@ export default function LoginPage() {
       if (!res.ok) {
         setError(data.error || "Login gagal.");
       } else {
+        // Simpan email untuk autocomplete berikutnya
+        localStorage.setItem("spmb_last_email", email);
         router.push("/dashboard");
       }
     } catch {
