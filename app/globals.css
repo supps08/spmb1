@@ -45,3 +45,95 @@ body {
   0%   { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
+
+/* ── Laporan: Export PDF / print ── */
+@media print {
+  .sidebar,
+  .sidebar-overlay,
+  .topbar,
+  .hamburger,
+  .sidebar-logout,
+  .no-print,
+  .export-btn,
+  .btn-export,
+  .btn-jadwal,
+  .notif-wrap,
+  .topbar-actions {
+    display: none !important;
+  }
+
+  body,
+  .main-content {
+    background: #fff !important;
+    color: #0c0c0c !important;
+  }
+
+  .main-content {
+    margin-left: 0 !important;
+    padding: 16px !important;
+    min-height: auto !important;
+  }
+
+  .laporan-page {
+    gap: 16px !important;
+  }
+
+  .print-only-title {
+    display: block !important;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #1c5c38;
+  }
+
+  .print-only-title h1 {
+    font-size: 18px;
+    font-weight: 700;
+    color: #0c0c0c;
+    margin-bottom: 4px;
+  }
+
+  .print-only-title p {
+    font-size: 12px;
+    color: #6b7280;
+  }
+
+  .stats-wrapper,
+  .panel,
+  .info-card,
+  .bottom-row {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .stats-wrapper {
+    border: 1px solid #e5e7eb !important;
+  }
+
+  .stat-card-l {
+    border-right: 1px solid #e5e7eb !important;
+  }
+
+  .info-card {
+    background: #1c5c38 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .progress-fill {
+    background: #1c5c38 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .bottom-row {
+    grid-template-columns: 1fr 280px !important;
+  }
+
+  .chart-wrap {
+    height: 220px !important;
+  }
+
+  .rekap-table tbody tr:hover td {
+    background: transparent !important;
+  }
+}
