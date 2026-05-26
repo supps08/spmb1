@@ -6,6 +6,7 @@
 // ============================================================
 
 import Link from "next/link";
+import LandingFooter from "@/components/landing/footer";
 
 export default function PendaftaranLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -156,6 +157,8 @@ export default function PendaftaranLayout({ children }: { children: React.ReactN
           </div>
         </div>
       </main>
+
+      <LandingFooter />
     </>
   );
 }
