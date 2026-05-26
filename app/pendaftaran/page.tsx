@@ -1,909 +1,1500 @@
+// ============================================================
+// PATH   : app/pendaftaran/page.tsx
+// ISI    : Formulir pendaftaran 5 tahap (calon siswa)
+//          - Data diri, akademik, orang tua, upload berkas, review
+//          - Simpan draft ke Supabase per tahap
+// ============================================================
+
 "use client";
 
-// ============================================================
-// PATH   : app/page.tsx
-// ISI    : Landing Page SPMB SMK Citra Negara
-//          - Navbar fixed (scroll effect)
-//          - Hero + foto grid floating
-//          - Marquee jurusan
-//          - Challenges section
-//          - Jurusan unggulan (PPLG, TKJ, MPLB)
-//          - Alur pendaftaran 4 langkah
-//          - Statistik (counter animation)
-//          - Testimonial carousel
-//          - CTA Final
-//          - Footer
-// ============================================================
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Check,
+  ArrowRight,
+  ArrowLeft,
+  Upload,
+  FileText,
+  X,
+} from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { useScrollAnimation } from "@/lib/useScrollAnimation";
 
-import Link from "next/link";
+const STEPS = [
+  "Data Diri",
+  "Data Akademik",
+  "Orang Tua",
+  "Upload Berkas",
+  "Review",
+] as const;
 
-export default function LandingPage() {
+const AGAMA_OPTIONS = ["Islam", "Kristen", "Katolik", "Hindu", "Buddha", "Konghucu"];
+
+interface Jurusan {
+  id: string;
+  kode: string;
+  nama: string;
+}
+
+interface FormData {
+  nama_lengkap: string;
+  nama_panggilan: string;
+  tempat_lahir: string;
+  tanggal_lahir: string;
+  jenis_kelamin: "" | "L" | "P";
+  agama: string;
+  alamat_lengkap: string;
+  no_pribadi: string;
+  nisn: string;
+  nik: string;
+  asal_sekolah: string;
+  jurusan_id: string;
+  nama_ayah: string;
+  nama_ibu: string;
+  no_ortu: string;
+  pekerjaan_ayah: string;
+  pekerjaan_ibu: string;
+}
+
+const EMPTY_FORM: FormData = {
+  nama_lengkap: "",
+  nama_panggilan: "",
+  tempat_lahir: "",
+  tanggal_lahir: "",
+  jenis_kelamin: "",
+  agama: "",
+  alamat_lengkap: "",
+  no_pribadi: "",
+  nisn: "",
+  nik: "",
+  asal_sekolah: "",
+  jurusan_id: "",
+  nama_ayah: "",
+  nama_ibu: "",
+  no_ortu: "",
+  pekerjaan_ayah: "",
+  pekerjaan_ibu: "",
+};
+
+type BerkasKey = "foto" | "ijazah" | "rapor" | "kk";
+
+const BERKAS_LABELS: Record<BerkasKey, string> = {
+  foto: "Foto 3×4",
+  ijazah: "Ijazah / SKL",
+  rapor: "Rapor",
+  kk: "Kartu Keluarga",
+};
+
+export default function PendaftaranPage() {
+  useScrollAnimation();
+
+  const router = useRouter();
+  const supabase = createClient();
+  const fileInputRefs = useRef<Partial<Record<BerkasKey, HTMLInputElement | null>>>({});
+
+  const [step, setStep] = useState(1);
+  const [form, setForm] = useState<FormData>(EMPTY_FORM);
+  const [jurusanList, setJurusanList] = useState<Jurusan[]>([]);
+  const [siswaId, setSiswaId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [berkasUrls, setBerkasUrls] = useState<Record<BerkasKey, string>>({
+    foto: "",
+    ijazah: "",
+    rapor: "",
+    kk: "",
+  });
+  const [berkasFiles, setBerkasFiles] = useState<Partial<Record<BerkasKey, File>>>({});
+  const [berkasPreviews, setBerkasPreviews] = useState<Partial<Record<BerkasKey, string>>>({});
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [errors, setErrors] = useState<string[]>([]);
+  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
+  const [dragBerkas, setDragBerkas] = useState<BerkasKey | null>(null);
+  const [alreadySubmitted, setAlreadySubmitted] = useState(false);
+
+  const showToast = useCallback((msg: string, type: "success" | "error") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3500);
+  }, []);
+
+  const updateField = useCallback(
+    <K extends keyof FormData>(key: K, value: FormData[K]) => {
+      setForm((p) => ({ ...p, [key]: value }));
+    },
+    []
+  );
+
+  useEffect(() => {
+    async function load() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+      setUserId(user.id);
+
+      const { data: jurusanData } = await supabase
+        .from("jurusan")
+        .select("id, kode, nama")
+        .eq("is_active", true)
+        .order("kode");
+      if (jurusanData) setJurusanList(jurusanData);
+
+      let { data: siswa } = await supabase
+        .from("siswa")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (!siswa) {
+        const { data: created, error: createErr } = await supabase
+          .from("siswa")
+          .insert({ user_id: user.id, status: "draft", tahap_terakhir: 1 })
+          .select()
+          .single();
+        if (createErr) {
+          showToast("Gagal memuat data pendaftaran.", "error");
+          setLoading(false);
+          return;
+        }
+        siswa = created;
+      }
+
+      setSiswaId(siswa.id);
+      if (siswa.status !== "draft") {
+        setAlreadySubmitted(true);
+      }
+
+      setForm({
+        nama_lengkap: siswa.nama_lengkap ?? "",
+        nama_panggilan: siswa.nama_panggilan ?? "",
+        tempat_lahir: siswa.tempat_lahir ?? "",
+        tanggal_lahir: siswa.tanggal_lahir ?? "",
+        jenis_kelamin: (siswa.jenis_kelamin as "" | "L" | "P") ?? "",
+        agama: siswa.agama ?? "",
+        alamat_lengkap: siswa.alamat_lengkap ?? "",
+        no_pribadi: siswa.no_pribadi ?? "",
+        nisn: siswa.nisn ?? "",
+        nik: siswa.nik ?? "",
+        asal_sekolah: siswa.asal_sekolah ?? "",
+        jurusan_id: siswa.jurusan_id ?? "",
+        nama_ayah: "",
+        nama_ibu: "",
+        no_ortu: "",
+        pekerjaan_ayah: "",
+        pekerjaan_ibu: "",
+      });
+
+      if (siswa.tahap_terakhir && siswa.tahap_terakhir >= 1 && siswa.tahap_terakhir <= 5) {
+        setStep(siswa.status === "draft" ? siswa.tahap_terakhir : 5);
+      }
+
+      const { data: ortu } = await supabase
+        .from("ortu")
+        .select("*")
+        .eq("siswa_id", siswa.id)
+        .maybeSingle();
+
+      if (ortu) {
+        setForm((p) => ({
+          ...p,
+          nama_ayah: ortu.nama_ayah ?? "",
+          nama_ibu: ortu.nama_ibu ?? "",
+          no_ortu: ortu.no_ortu ?? "",
+          pekerjaan_ayah: ortu.pekerjaan_ayah ?? "",
+          pekerjaan_ibu: ortu.pekerjaan_ibu ?? "",
+        }));
+      }
+
+      const { data: berkas } = await supabase
+        .from("berkas")
+        .select("foto_url, ijazah_url, rapor_url, kk_url")
+        .eq("siswa_id", siswa.id)
+        .maybeSingle();
+
+      if (berkas) {
+        setBerkasUrls({
+          foto: berkas.foto_url ?? "",
+          ijazah: berkas.ijazah_url ?? "",
+          rapor: berkas.rapor_url ?? "",
+          kk: berkas.kk_url ?? "",
+        });
+      }
+
+      setLoading(false);
+    }
+
+    load();
+  }, [supabase, router, showToast]);
+
+  function validateStep(current: number): string[] {
+    const errs: string[] = [];
+    if (current === 1) {
+      if (!form.nama_lengkap.trim()) errs.push("Nama lengkap wajib diisi.");
+      if (!form.nama_panggilan.trim()) errs.push("Nama panggilan wajib diisi.");
+      if (!form.tempat_lahir.trim()) errs.push("Tempat lahir wajib diisi.");
+      if (!form.tanggal_lahir) errs.push("Tanggal lahir wajib diisi.");
+      if (!form.jenis_kelamin) errs.push("Jenis kelamin wajib dipilih.");
+      if (!form.agama) errs.push("Agama wajib dipilih.");
+      if (!form.alamat_lengkap.trim()) errs.push("Alamat lengkap wajib diisi.");
+      if (!form.no_pribadi.trim()) errs.push("Nomor HP pribadi wajib diisi.");
+      if (!form.nisn.trim() || form.nisn.replace(/\D/g, "").length !== 10) {
+        errs.push("NISN wajib 10 digit angka.");
+      }
+      if (!form.nik.trim() || form.nik.replace(/\D/g, "").length !== 16) {
+        errs.push("NIK wajib 16 digit angka.");
+      }
+      if (!form.asal_sekolah.trim()) errs.push("Asal sekolah wajib diisi.");
+      if (!form.jurusan_id) errs.push("Pilihan jurusan wajib dipilih.");
+    }
+    if (current === 2) {
+      if (!form.nisn.trim() || form.nisn.replace(/\D/g, "").length !== 10) {
+        errs.push("NISN wajib 10 digit angka.");
+      }
+      if (!form.nik.trim() || form.nik.replace(/\D/g, "").length !== 16) {
+        errs.push("NIK wajib 16 digit angka.");
+      }
+      if (!form.asal_sekolah.trim()) errs.push("Asal sekolah wajib diisi.");
+      if (!form.jurusan_id) errs.push("Pilihan jurusan wajib dipilih.");
+    }
+    if (current === 3) {
+      if (!form.nama_ayah.trim()) errs.push("Nama ayah wajib diisi.");
+      if (!form.nama_ibu.trim()) errs.push("Nama ibu wajib diisi.");
+      if (!form.no_ortu.trim()) errs.push("Nomor HP orang tua wajib diisi.");
+    }
+    if (current === 4) {
+      (["foto", "ijazah", "rapor", "kk"] as BerkasKey[]).forEach((key) => {
+        if (!berkasUrls[key] && !berkasFiles[key]) {
+          errs.push(`${BERKAS_LABELS[key]} wajib diunggah.`);
+        }
+      });
+    }
+    return errs;
+  }
+
+  async function uploadBerkasFile(key: BerkasKey, file: File) {
+    if (!userId || !siswaId) return null;
+    const ext = file.name.split(".").pop()?.toLowerCase() || "pdf";
+    const path = `${userId}/${key}/berkas.${ext}`;
+    const { error: upErr } = await supabase.storage
+      .from("berkas-pendaftaran")
+      .upload(path, file, { upsert: true, contentType: file.type });
+
+    if (upErr) {
+      throw new Error(upErr.message);
+    }
+
+    const { data: signed } = await supabase.storage
+      .from("berkas-pendaftaran")
+      .createSignedUrl(path, 60 * 60 * 24 * 365);
+
+    return signed?.signedUrl ?? path;
+  }
+
+  async function persistStep(current: number) {
+    if (!siswaId) return;
+
+    if (current === 1) {
+      const { error } = await supabase
+        .from("siswa")
+        .update({
+          nama_lengkap: form.nama_lengkap.trim(),
+          nama_panggilan: form.nama_panggilan.trim(),
+          tempat_lahir: form.tempat_lahir.trim(),
+          tanggal_lahir: form.tanggal_lahir || null,
+          jenis_kelamin: form.jenis_kelamin || null,
+          agama: form.agama,
+          alamat_lengkap: form.alamat_lengkap.trim(),
+          no_pribadi: form.no_pribadi.trim(),
+          nisn: form.nisn.replace(/\D/g, ""),
+          nik: form.nik.replace(/\D/g, ""),
+          asal_sekolah: form.asal_sekolah.trim(),
+          jurusan_id: form.jurusan_id || null,
+          tahap_terakhir: 2,
+        })
+        .eq("id", siswaId);
+      if (error) throw new Error(error.message);
+    }
+
+    if (current === 2) {
+      const { error } = await supabase
+        .from("siswa")
+        .update({
+          nisn: form.nisn.replace(/\D/g, ""),
+          nik: form.nik.replace(/\D/g, ""),
+          asal_sekolah: form.asal_sekolah.trim(),
+          jurusan_id: form.jurusan_id || null,
+          tahap_terakhir: 3,
+        })
+        .eq("id", siswaId);
+      if (error) throw new Error(error.message);
+    }
+
+    if (current === 3) {
+      const ortuPayload = {
+        siswa_id: siswaId,
+        nama_ayah: form.nama_ayah.trim(),
+        nama_ibu: form.nama_ibu.trim(),
+        no_ortu: form.no_ortu.trim(),
+        pekerjaan_ayah: form.pekerjaan_ayah.trim() || null,
+        pekerjaan_ibu: form.pekerjaan_ibu.trim() || null,
+      };
+      const { data: existing } = await supabase
+        .from("ortu")
+        .select("id")
+        .eq("siswa_id", siswaId)
+        .maybeSingle();
+
+      if (existing) {
+        const { error } = await supabase
+          .from("ortu")
+          .update(ortuPayload)
+          .eq("siswa_id", siswaId);
+        if (error) throw new Error(error.message);
+      } else {
+        const { error } = await supabase.from("ortu").insert(ortuPayload);
+        if (error) throw new Error(error.message);
+      }
+
+      await supabase
+        .from("siswa")
+        .update({ tahap_terakhir: 4 })
+        .eq("id", siswaId);
+    }
+
+    if (current === 4) {
+      const urls = { ...berkasUrls };
+      for (const key of ["foto", "ijazah", "rapor", "kk"] as BerkasKey[]) {
+        const file = berkasFiles[key];
+        if (file) {
+          urls[key] = (await uploadBerkasFile(key, file)) ?? urls[key];
+        }
+      }
+      setBerkasUrls(urls);
+
+      const berkasPayload = {
+        siswa_id: siswaId,
+        foto_url: urls.foto || null,
+        ijazah_url: urls.ijazah || null,
+        rapor_url: urls.rapor || null,
+        kk_url: urls.kk || null,
+      };
+
+      const { data: existingBerkas } = await supabase
+        .from("berkas")
+        .select("id")
+        .eq("siswa_id", siswaId)
+        .maybeSingle();
+
+      if (existingBerkas) {
+        const { error } = await supabase
+          .from("berkas")
+          .update(berkasPayload)
+          .eq("siswa_id", siswaId);
+        if (error) throw new Error(error.message);
+      } else {
+        const { error } = await supabase.from("berkas").insert(berkasPayload);
+        if (error) throw new Error(error.message);
+      }
+
+      setBerkasFiles({});
+      await supabase
+        .from("siswa")
+        .update({ tahap_terakhir: 5 })
+        .eq("id", siswaId);
+    }
+  }
+
+  async function handleNext() {
+    if (alreadySubmitted) return;
+    const errs = validateStep(step);
+    if (errs.length > 0) {
+      setErrors(errs);
+      return;
+    }
+    setErrors([]);
+    setSaving(true);
+    try {
+      await persistStep(step);
+      setStep((s) => Math.min(s + 1, 5));
+      showToast("Data tahap ini berhasil disimpan.", "success");
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Gagal menyimpan data.", "error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleBack() {
+    setErrors([]);
+    setStep((s) => Math.max(s - 1, 1));
+  }
+
+  async function handleSubmit() {
+    const errs = validateStep(4);
+    if (errs.length > 0) {
+      setErrors(errs);
+      setStep(4);
+      return;
+    }
+    setErrors([]);
+    setSubmitting(true);
+    try {
+      await persistStep(4);
+      const { error } = await supabase
+        .from("siswa")
+        .update({
+          status: "submitted",
+          submitted_at: new Date().toISOString(),
+          tahap_terakhir: 5,
+        })
+        .eq("id", siswaId!);
+      if (error) throw new Error(error.message);
+      setAlreadySubmitted(true);
+      showToast("Pendaftaran berhasil dikirim!", "success");
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Gagal mengirim pendaftaran.", "error");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function handleBerkasSelect(key: BerkasKey, file: File | null) {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      showToast("Ukuran file maksimal 5 MB.", "error");
+      return;
+    }
+    setBerkasFiles((p) => ({ ...p, [key]: file }));
+    const preview = URL.createObjectURL(file);
+    setBerkasPreviews((p) => {
+      if (p[key]) URL.revokeObjectURL(p[key]!);
+      return { ...p, [key]: preview };
+    });
+  }
+
+  function clearBerkas(key: BerkasKey) {
+    setBerkasFiles((p) => {
+      const next = { ...p };
+      delete next[key];
+      return next;
+    });
+    setBerkasPreviews((p) => {
+      if (p[key]) URL.revokeObjectURL(p[key]!);
+      const next = { ...p };
+      delete next[key];
+      return next;
+    });
+    setBerkasUrls((p) => ({ ...p, [key]: "" }));
+  }
+
+  const jurusanName =
+    jurusanList.find((j) => j.id === form.jurusan_id)?.nama ?? "—";
+
+  if (loading) {
+    return (
+      <div className="pend-loading" data-animate data-delay="0">
+        <div className="pend-spinner" />
+        <p>Memuat formulir pendaftaran...</p>
+      </div>
+    );
+  }
+
   return (
     <>
       <style>{`
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-        :root {
-          --bg: #FFFFFF;
-          --bg-soft: #F5F2EC;
-          --ink: #0C0C0C;
-          --ink-2: #1A1A1A;
-          --muted: #696969;
-          --muted-light: #A8A8A8;
-          --accent: #1C5C38;
-          --accent-mid: #2A7A4E;
-          --accent-light: #EBF4EE;
-          --border: rgba(0,0,0,0.08);
-          --border-dark: rgba(255,255,255,0.1);
-          --radius-sm: 8px;
-          --radius: 14px;
-          --radius-lg: 22px;
-          --radius-pill: 100px;
+        .pend-stepper-wrap {
+          margin-bottom: 28px;
         }
 
-        html { scroll-behavior: smooth; }
-
-        body {
-          font-family: 'Plus Jakarta Sans', sans-serif;
-          background: var(--bg);
-          color: var(--ink);
-          overflow-x: hidden;
+        .pend-stepper {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          position: relative;
         }
 
-        h1, h2, h3, h4 {
-          font-family: 'Bricolage Grotesque', sans-serif;
-          letter-spacing: -0.03em;
-          line-height: 1.05;
+        .pend-step-item {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          position: relative;
+          z-index: 1;
         }
 
-        .container {
-          max-width: 1200px;
-          margin: 0 auto;
-          padding: 0 5vw;
+        .pend-step-line {
+          position: absolute;
+          top: 18px;
+          left: 50%;
+          right: -50%;
+          height: 2px;
+          background: #E5E7EB;
+          z-index: 0;
         }
 
-        .btn-primary {
-          display: inline-flex; align-items: center; gap: 8px;
-          background: var(--ink); color: #fff;
-          border: none; border-radius: var(--radius-pill);
-          padding: 14px 28px;
-          font-family: 'Plus Jakarta Sans', sans-serif;
-          font-size: 0.9rem; font-weight: 600;
-          cursor: pointer; text-decoration: none;
-          transition: all 0.25s ease; white-space: nowrap;
-        }
-        .btn-primary:hover { transform: translateY(-2px); background: #222; box-shadow: 0 8px 24px rgba(0,0,0,0.15); }
-
-        .btn-outline {
-          display: inline-flex; align-items: center; gap: 8px;
-          background: transparent; color: var(--ink);
-          border: 1.5px solid var(--ink); border-radius: var(--radius-pill);
-          padding: 14px 28px;
-          font-family: 'Plus Jakarta Sans', sans-serif;
-          font-size: 0.9rem; font-weight: 600;
-          cursor: pointer; text-decoration: none;
-          transition: all 0.25s ease; white-space: nowrap;
-        }
-        .btn-outline:hover { transform: translateY(-2px); background: var(--ink); color: #fff; }
-
-        .btn-outline-white {
-          display: inline-flex; align-items: center; gap: 8px;
-          background: transparent; color: #fff;
-          border: 1.5px solid rgba(255,255,255,0.4); border-radius: var(--radius-pill);
-          padding: 14px 28px;
-          font-family: 'Plus Jakarta Sans', sans-serif;
-          font-size: 0.9rem; font-weight: 600;
-          cursor: pointer; text-decoration: none;
-          transition: all 0.25s ease;
-        }
-        .btn-outline-white:hover { transform: translateY(-2px); background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.7); }
-
-        .section-label {
-          display: inline-flex; align-items: center; gap: 8px;
-          font-size: 0.78rem; font-weight: 600;
-          letter-spacing: 0.08em; text-transform: uppercase;
-          color: var(--accent); margin-bottom: 20px;
-        }
-        .section-label::before {
-          content: ''; width: 6px; height: 6px;
-          border-radius: 50%; background: var(--accent); flex-shrink: 0;
+        .pend-step-item:last-child .pend-step-line {
+          display: none;
         }
 
-        /* ANIMATIONS */
-        @keyframes float-a { 0%,100%{transform:translateY(0) rotate(-2deg)} 50%{transform:translateY(-12px) rotate(-2deg)} }
-        @keyframes float-b { 0%,100%{transform:translateY(0) rotate(1.5deg)} 50%{transform:translateY(-16px) rotate(1.5deg)} }
-        @keyframes float-c { 0%,100%{transform:translateY(0) rotate(-1deg)} 50%{transform:translateY(-8px) rotate(-1deg)} }
-        @keyframes float-d { 0%,100%{transform:translateY(0) rotate(2deg)} 50%{transform:translateY(-10px) rotate(2deg)} }
-        @keyframes marquee-left { from{transform:translateX(0)} to{transform:translateX(-50%)} }
-        @keyframes marquee-right { from{transform:translateX(-50%)} to{transform:translateX(0)} }
-        @keyframes fadeUp { from{opacity:0;transform:translateY(28px)} to{opacity:1;transform:translateY(0)} }
-        @keyframes fadeIn { from{opacity:0} to{opacity:1} }
-        @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.3)} }
-
-        .reveal {
-          opacity: 0; transform: translateY(28px);
-          transition: opacity 0.65s ease, transform 0.65s ease;
-        }
-        .reveal.visible { opacity: 1; transform: translateY(0); }
-        .reveal-delay-1 { transition-delay: 0.1s; }
-        .reveal-delay-2 { transition-delay: 0.2s; }
-        .reveal-delay-3 { transition-delay: 0.3s; }
-
-        /* ===== NAVBAR ===== */
-        nav {
-          position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
-          backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-          background: rgba(255,255,255,0.88);
-          border-bottom: 1px solid var(--border);
-          transition: box-shadow 0.3s ease;
-        }
-        nav.scrolled { box-shadow: 0 4px 24px rgba(0,0,0,0.06); }
-        .nav-inner {
-          display: flex; align-items: center;
-          justify-content: space-between; height: 68px; gap: 32px;
-        }
-        .nav-logo {
-          font-family: 'Bricolage Grotesque', sans-serif;
-          font-weight: 800; font-size: 1.15rem;
-          color: var(--ink); text-decoration: none;
-          letter-spacing: -0.02em; flex-shrink: 0;
-        }
-        .nav-logo span { color: var(--accent); }
-        .nav-links { display: flex; align-items: center; gap: 32px; list-style: none; }
-        .nav-links a {
-          font-size: 0.88rem; font-weight: 500; color: var(--muted);
-          text-decoration: none; transition: color 0.2s ease;
-        }
-        .nav-links a:hover { color: var(--ink); }
-
-        /* ===== HERO ===== */
-        .hero {
-          padding: 140px 0 100px;
-          display: grid; grid-template-columns: 1fr 1fr;
-          gap: 60px; align-items: center; min-height: 100vh;
-        }
-        .hero-left { animation: fadeUp 0.9s ease forwards; }
-        .hero-badge {
-          display: inline-flex; align-items: center; gap: 8px;
-          background: var(--accent-light); color: var(--accent);
-          border-radius: var(--radius-pill); padding: 8px 16px;
-          font-size: 0.78rem; font-weight: 600;
-          letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 28px;
-        }
-        .hero-badge::before {
-          content: ''; width: 7px; height: 7px;
-          background: var(--accent); border-radius: 50%;
-          animation: pulse 2s infinite;
-        }
-        .hero h1 {
-          font-size: clamp(3rem, 5.5vw, 5rem); font-weight: 800;
-          color: var(--ink); margin-bottom: 24px; max-width: 560px;
-        }
-        .hero p {
-          font-size: 1.05rem; color: var(--muted);
-          line-height: 1.7; margin-bottom: 40px;
-          max-width: 440px; font-weight: 400;
-        }
-        .hero-ctas { display: flex; gap: 14px; flex-wrap: wrap; }
-
-        .hero-right {
-          position: relative; height: 560px;
-          animation: fadeIn 1.1s ease 0.3s forwards; opacity: 0;
-        }
-        .hero-photo {
-          position: absolute; border-radius: 20px;
-          border: 3px solid white; object-fit: cover;
-          box-shadow: 0 12px 40px rgba(0,0,0,0.12);
-        }
-        .hero-photo-1 { width:220px;height:280px;top:0;left:20px;animation:float-a 5s ease-in-out infinite; }
-        .hero-photo-2 { width:180px;height:220px;top:30px;left:255px;animation:float-b 6s ease-in-out infinite 0.5s; }
-        .hero-photo-3 { width:200px;height:260px;top:20px;right:0;animation:float-c 5.5s ease-in-out infinite 1s; }
-        .hero-photo-4 { width:240px;height:200px;bottom:60px;left:10px;animation:float-d 6.5s ease-in-out infinite 0.7s; }
-        .hero-photo-5 { width:180px;height:220px;bottom:20px;right:30px;animation:float-a 5.8s ease-in-out infinite 1.2s; }
-
-        .hero-badge-float {
-          position: absolute; bottom: 120px; left: 50%;
-          transform: translateX(-50%);
-          background: white; border-radius: var(--radius);
-          padding: 14px 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.12);
-          display: flex; align-items: center; gap: 12px;
-          white-space: nowrap; z-index: 10;
-          animation: float-b 4s ease-in-out infinite;
-        }
-        .hero-badge-float .num {
-          font-family: 'Bricolage Grotesque', sans-serif;
-          font-weight: 800; font-size: 1.5rem; color: var(--ink);
-        }
-        .hero-badge-float .lbl { font-size: 0.8rem; color: var(--muted); font-weight: 500; }
-        .hero-badge-float .dot {
-          width: 36px; height: 36px; border-radius: 50%;
-          background: var(--accent-light);
-          display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        .pend-step-line.done {
+          background: #1C5C38;
         }
 
-        /* ===== MARQUEE ===== */
-        .marquee-section { background: var(--ink-2,#1A1A1A); padding: 22px 0; overflow: hidden; }
-        .marquee-track {
-          display: flex; width: max-content;
-          animation: marquee-left 22s linear infinite;
-        }
-        .marquee-item {
-          display: flex; align-items: center; gap: 24px;
-          padding: 0 24px; font-size: 0.82rem; font-weight: 700;
-          letter-spacing: 0.1em; text-transform: uppercase;
-          color: rgba(255,255,255,0.5); white-space: nowrap;
-        }
-        .marquee-dot { width:6px;height:6px;background:var(--accent);border-radius:50%;flex-shrink:0; }
-
-        /* ===== CHALLENGES ===== */
-        .challenges { background: var(--bg-soft); padding: 120px 0; }
-        .challenges-inner {
-          display: grid; grid-template-columns: 1fr 1fr;
-          gap: 80px; align-items: center;
-        }
-        .challenges h2 { font-size: clamp(2rem,3.5vw,3rem); font-weight: 800; margin-bottom: 16px; }
-        .challenges-desc { color: var(--muted); line-height: 1.7; margin-bottom: 40px; font-size: 0.97rem; }
-        .challenge-card {
-          background: white; border: 1px solid var(--border);
-          border-radius: var(--radius); padding: 22px 24px;
-          margin-bottom: 14px; display: flex; align-items: flex-start; gap: 16px;
-          transition: box-shadow 0.25s ease, transform 0.25s ease;
-        }
-        .challenge-card:hover { box-shadow: 0 6px 24px rgba(0,0,0,0.07); transform: translateY(-2px); }
-        .challenge-icon {
-          width: 44px; height: 44px; border-radius: var(--radius-sm);
-          background: var(--accent-light);
-          display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-        }
-        .challenge-icon svg { width: 22px; height: 22px; color: var(--accent); }
-        .challenge-title { font-family:'Bricolage Grotesque',sans-serif; font-weight:700; font-size:1rem; margin-bottom:4px; letter-spacing:-0.01em; }
-        .challenge-text { font-size:0.85rem; color:var(--muted); line-height:1.55; }
-        .challenges-right { position: relative; }
-        .challenges-img { width:100%;height:500px;object-fit:cover;border-radius:20px;display:block; }
-        .stat-float {
-          position: absolute; bottom: 30px; left: -24px;
-          background: white; border-radius: var(--radius);
-          padding: 18px 22px; box-shadow: 0 12px 40px rgba(0,0,0,0.12);
-        }
-        .stat-float .big { font-family:'Bricolage Grotesque',sans-serif;font-size:2rem;font-weight:800;color:var(--ink); }
-        .stat-float .lbl { font-size:0.8rem;color:var(--muted);margin-top:2px; }
-
-        /* ===== JURUSAN ===== */
-        .jurusan { padding: 120px 0; }
-        .jurusan-header { margin-bottom: 60px; }
-        .jurusan h2 { font-size: clamp(2rem,3.5vw,3rem); font-weight: 800; }
-        .jurusan-item {
-          display: grid; grid-template-columns: 280px 1fr;
-          gap: 36px; align-items: center;
-          padding: 28px 0; border-bottom: 1px solid var(--border);
-          transition: background 0.25s ease; cursor: pointer; border-radius: var(--radius-sm);
-        }
-        .jurusan-item:first-child { border-top: 1px solid var(--border); }
-        .jurusan-item:hover { background:var(--bg-soft);padding-left:16px;padding-right:16px;margin:0 -16px; }
-        .jurusan-img-wrap { position: relative; flex-shrink: 0; }
-        .jurusan-img { width:100%;height:170px;object-fit:cover;border-radius:var(--radius);display:block; }
-        .jurusan-badge {
-          position: absolute; top: 12px; left: 12px;
-          background: var(--ink); color: white;
-          font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em;
-          text-transform: uppercase; padding: 5px 12px; border-radius: var(--radius-pill);
-        }
-        .jurusan-name { font-family:'Bricolage Grotesque',sans-serif;font-size:1.4rem;font-weight:700;letter-spacing:-0.02em;margin-bottom:8px; }
-        .jurusan-desc { font-size:0.9rem;color:var(--muted);line-height:1.6;max-width:500px; }
-        .jurusan-arrow { margin-top:16px;display:inline-flex;align-items:center;gap:6px;font-size:0.82rem;font-weight:600;color:var(--accent); }
-
-        /* ===== ALUR ===== */
-        .alur { padding: 120px 0; background: var(--bg); }
-        .alur-top { display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:80px;gap:40px; }
-        .alur-top-left { flex: 1; }
-        .alur h2 { font-size:clamp(2rem,3.5vw,3rem);font-weight:800; }
-        .alur-step {
-          display: grid; grid-template-columns: 80px 1px 1fr;
-          gap: 0 32px; align-items: start;
-          padding: 36px 0; border-bottom: 1px solid var(--border);
-        }
-        .alur-step:first-child { border-top: 1px solid var(--border); }
-        .step-num { font-family:'Bricolage Grotesque',sans-serif;font-size:3rem;font-weight:800;color:rgba(0,0,0,0.06);line-height:1;padding-top:4px; }
-        .step-divider { background:var(--border);width:1px;align-self:stretch;margin:4px 0; }
-        .step-content { padding-top: 4px; }
-        .step-title { font-family:'Bricolage Grotesque',sans-serif;font-size:1.2rem;font-weight:700;margin-bottom:10px;letter-spacing:-0.01em; }
-        .step-desc { font-size:0.9rem;color:var(--muted);line-height:1.65;max-width:480px; }
-
-        /* ===== STATISTIK ===== */
-        .stats { background: var(--ink-2,#1A1A1A); padding: 120px 0; }
-        .stats-label { color: rgba(255,255,255,0.5); }
-        .stats-label::before { background: var(--accent); }
-        .stats h2 { font-size:clamp(2rem,3.5vw,3rem);color:white;font-weight:800;margin-bottom:80px;max-width:500px; }
-        .stats-grid { display:grid;grid-template-columns:repeat(4,1fr);gap:0; }
-        .stat-item { padding:40px;border-right:1px solid var(--border-dark); }
-        .stat-item:last-child { border-right: none; }
-        .stat-num { font-family:'Bricolage Grotesque',sans-serif;font-size:clamp(2.8rem,5vw,4rem);font-weight:800;color:white;line-height:1;margin-bottom:12px; }
-        .stat-num span { color: var(--accent); }
-        .stat-lbl { font-size:0.85rem;color:rgba(255,255,255,0.45);font-weight:500;text-transform:uppercase;letter-spacing:0.06em; }
-
-        /* ===== MARQUEE 2 ===== */
-        .marquee-section-2 { background:var(--bg-soft);padding:22px 0;overflow:hidden; }
-        .marquee-track-2 { display:flex;width:max-content;animation:marquee-right 40s linear infinite; }
-        .marquee-item-2 { display:flex;align-items:center;gap:24px;padding:0 24px;font-size:0.82rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:rgba(0,0,0,0.3);white-space:nowrap; }
-        .marquee-dot-2 { width:5px;height:5px;background:var(--accent);border-radius:50%;flex-shrink:0; }
-
-        /* ===== TESTIMONIAL ===== */
-        .testimonial { padding: 120px 0; overflow: hidden; }
-        .testimonial h2 { font-size:clamp(2rem,3.5vw,3rem);font-weight:800;margin-bottom:60px; }
-        .testi-track-wrap { overflow: hidden; }
-        .testi-track { display:flex;gap:24px;animation:marquee-left 30s linear infinite;width:max-content; }
-        .testi-track:hover { animation-play-state: paused; }
-        .testi-card { background:var(--bg-soft);border-radius:var(--radius-lg);padding:36px;width:380px;flex-shrink:0;display:flex;flex-direction:column;gap:20px; }
-        .testi-quote { font-size:0.97rem;line-height:1.7;color:var(--ink);font-style:italic;flex:1; }
-        .testi-author { display:flex;align-items:center;gap:14px; }
-        .testi-avatar { width:44px;height:44px;border-radius:50%;object-fit:cover;border:2px solid white;box-shadow:0 2px 12px rgba(0,0,0,0.1); }
-        .testi-name { font-weight:700;font-size:0.9rem; }
-        .testi-jurusan { font-size:0.8rem;color:var(--muted); }
-
-        /* ===== CTA FINAL ===== */
-        .cta-section { padding: 80px 0; background: var(--bg-soft); }
-        .cta-inner {
-          background: var(--ink-2,#1A1A1A); border-radius: 32px; padding: 80px;
-          display: grid; grid-template-columns: 1fr auto;
-          gap: 60px; align-items: center; position: relative; overflow: hidden;
-        }
-        .cta-inner::before {
-          content: ''; position: absolute; top: -80px; right: -80px;
-          width: 320px; height: 320px;
-          background: radial-gradient(circle, rgba(28,92,56,0.3) 0%, transparent 70%);
+        .pend-step-circle {
+          width: 36px;
+          height: 36px;
           border-radius: 50%;
-        }
-        .cta-label { color: rgba(255,255,255,0.5); }
-        .cta-label::before { background: var(--accent); }
-        .cta-inner h2 { font-size:clamp(2.2rem,4vw,3.5rem);color:white;font-weight:800;margin-bottom:16px; }
-        .cta-inner p { color:rgba(255,255,255,0.6);line-height:1.65;max-width:440px;margin-bottom:36px; }
-        .cta-buttons { display:flex;gap:14px;flex-wrap:wrap; }
-        .btn-white {
-          display:inline-flex;align-items:center;gap:8px;
-          background:white;color:var(--ink);border:none;border-radius:var(--radius-pill);
-          padding:14px 28px;font-family:'Plus Jakarta Sans',sans-serif;
-          font-weight:700;font-size:0.9rem;cursor:pointer;text-decoration:none;
-          transition:all 0.25s ease;
-        }
-        .btn-white:hover { transform:translateY(-2px);box-shadow:0 8px 24px rgba(255,255,255,0.2); }
-        .cta-deco { position:relative;width:260px;height:280px;flex-shrink:0; }
-        .cta-deco img { width:240px;height:260px;object-fit:cover;border-radius:20px;border:3px solid rgba(255,255,255,0.1); }
-        .cta-deco-badge {
-          position:absolute;bottom:-10px;left:-20px;
-          background:var(--accent);color:white;border-radius:var(--radius);
-          padding:14px 18px;font-size:0.85rem;font-weight:700;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 13px;
+          font-weight: 700;
+          margin-bottom: 8px;
+          position: relative;
+          z-index: 2;
+          transition: all 0.2s ease;
         }
 
-        /* ===== FOOTER ===== */
-        footer { background: #080808; padding: 80px 0 40px; }
-        .footer-top {
-          display:grid;grid-template-columns:2fr 1fr 1fr;gap:60px;
-          padding-bottom:60px;border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:40px;
-        }
-        .footer-logo { font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:1.15rem;color:white;letter-spacing:-0.02em;margin-bottom:16px; }
-        .footer-logo span { color: var(--accent); }
-        .footer-tagline { font-size:0.88rem;color:rgba(255,255,255,0.4);line-height:1.65;max-width:280px;margin-bottom:24px; }
-        .footer-email { font-size:0.85rem;color:rgba(255,255,255,0.55);text-decoration:none;transition:color 0.2s; }
-        .footer-email:hover { color: white; }
-        .footer-col-title { font-family:'Bricolage Grotesque',sans-serif;font-weight:700;color:rgba(255,255,255,0.6);font-size:0.8rem;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:20px; }
-        .footer-links { list-style:none;display:flex;flex-direction:column;gap:12px; }
-        .footer-links a { font-size:0.88rem;color:rgba(255,255,255,0.4);text-decoration:none;transition:color 0.2s; }
-        .footer-links a:hover { color: white; }
-        .footer-bottom { display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px; }
-        .footer-copy { font-size:0.82rem;color:rgba(255,255,255,0.25); }
-
-        /* ===== RESPONSIVE ===== */
-        @media (max-width: 900px) {
-          .hero { grid-template-columns: 1fr; padding: 120px 0 60px; }
-          .hero-right { height: 340px; }
-          .hero-photo-1 { width:160px;height:200px; }
-          .hero-photo-2 { width:130px;height:160px;left:180px; }
-          .hero-photo-3 { width:150px;height:190px; }
-          .hero-photo-4 { width:180px;height:150px;bottom:20px; }
-          .hero-photo-5 { width:140px;height:170px; }
-          .challenges-inner { grid-template-columns: 1fr; }
-          .jurusan-item { grid-template-columns: 1fr; }
-          .jurusan-img { height: 220px; }
-          .alur-top { flex-direction: column; align-items: flex-start; }
-          .stats-grid { grid-template-columns: repeat(2,1fr); }
-          .stat-item { border-right:none;border-bottom:1px solid var(--border-dark); }
-          .cta-inner { grid-template-columns: 1fr; padding: 48px; }
-          .cta-deco { display: none; }
-          .footer-top { grid-template-columns: 1fr 1fr; }
-          .nav-links { display: none; }
+        .pend-step-circle.pending {
+          background: #fff;
+          border: 2px solid #E5E7EB;
+          color: #6B7280;
         }
 
-        @media (max-width: 600px) {
-          .stats-grid { grid-template-columns: 1fr 1fr; }
-          .footer-top { grid-template-columns: 1fr; }
-          .alur-step { grid-template-columns: 60px 1px 1fr; gap: 0 20px; }
-          .step-num { font-size: 2rem; }
-          .hero-ctas { flex-direction: column; }
+        .pend-step-circle.active {
+          background: #1C5C38;
+          color: #fff;
+          border: 2px solid #1C5C38;
+          box-shadow: 0 0 0 4px #EBF4EE;
+        }
+
+        .pend-step-circle.done {
+          background: #1C5C38;
+          color: #fff;
+          border: 2px solid #1C5C38;
+        }
+
+        .pend-step-label {
+          font-size: 11px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          text-align: center;
+          color: #6B7280;
+          max-width: 90px;
+          line-height: 1.3;
+        }
+
+        .pend-step-label.active {
+          color: #1C5C38;
+        }
+
+        .pend-progress-text {
+          text-align: center;
+          font-size: 13px;
+          font-weight: 600;
+          color: #6B7280;
+          margin-top: 16px;
+        }
+
+        .form-card {
+          background: #fff;
+          border: 1px solid #E5E7EB;
+          border-radius: 12px;
+          padding: 32px;
+          margin-bottom: 8px;
+        }
+
+        .form-card-inner {
+          animation: slideInRight 0.3s ease;
+        }
+
+        .form-section-title {
+          font-family: 'Bricolage Grotesque', sans-serif;
+          font-size: 17px;
+          font-weight: 700;
+          color: #0C0C0C;
+          margin-bottom: 20px;
+        }
+
+        .form-grid-2 {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 16px;
+        }
+
+        .form-grid-4 {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 16px;
+        }
+
+        .form-group {
+          margin-bottom: 16px;
+        }
+
+        .form-group label {
+          display: block;
+          font-size: 12px;
+          font-weight: 600;
+          color: #374151;
+          margin-bottom: 6px;
+        }
+
+        .form-input,
+        .form-select,
+        .form-textarea {
+          width: 100%;
+          padding: 10px 12px;
+          border: 1px solid #E5E7EB;
+          border-radius: 8px;
+          font-family: 'Plus Jakarta Sans', sans-serif;
+          font-size: 14px;
+          color: #0C0C0C;
+          background: #fff;
+          outline: none;
+          transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .form-textarea {
+          min-height: 96px;
+          resize: vertical;
+        }
+
+        .form-input:focus,
+        .form-select:focus,
+        .form-textarea:focus {
+          border-color: #1C5C38;
+          box-shadow: 0 0 0 3px rgba(28, 92, 56, 0.08);
+        }
+
+        .form-errors {
+          background: #FEE2E2;
+          border: 1px solid #FECACA;
+          border-radius: 8px;
+          padding: 12px 14px;
+          margin-bottom: 16px;
+          font-size: 13px;
+          color: #991B1B;
+        }
+
+        .form-errors ul {
+          margin: 0;
+          padding-left: 18px;
+        }
+
+        .form-actions {
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+          margin-top: 24px;
+          padding-top: 20px;
+          border-top: 1px solid #F3F4F6;
+        }
+
+        .btn-back {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 11px 20px;
+          background: #fff;
+          color: #374151;
+          border: 1px solid #E5E7EB;
+          border-radius: 10px;
+          font-family: inherit;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background 0.15s, border-color 0.15s;
+        }
+
+        .btn-back:hover:not(:disabled) {
+          background: #F9FAFB;
+          border-color: #D1D5DB;
+        }
+
+        .btn-next {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 11px 22px;
+          background: #1C5C38;
+          color: #fff;
+          border: none;
+          border-radius: 10px;
+          font-family: inherit;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background 0.15s;
+          margin-left: auto;
+        }
+
+        .btn-next:hover:not(:disabled) {
+          background: #2A7A4E;
+        }
+
+        .btn-next:disabled,
+        .btn-back:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        .upload-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 16px;
+        }
+
+        .upload-zone {
+          border: 2px dashed #E5E7EB;
+          border-radius: 12px;
+          padding: 20px 16px;
+          text-align: center;
+          cursor: pointer;
+          transition: border-color 0.2s, background 0.2s;
+          min-height: 140px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+        }
+
+        .upload-zone:hover,
+        .upload-zone.drag-over {
+          border-color: #1C5C38;
+          background: #F2F8F4;
+        }
+
+        .upload-zone.has-file {
+          border-style: solid;
+          border-color: #EBF4EE;
+          background: #F2F8F4;
+        }
+
+        .upload-zone p {
+          font-size: 13px;
+          color: #374151;
+          font-weight: 500;
+        }
+
+        .upload-zone span {
+          font-size: 11px;
+          color: #6B7280;
+        }
+
+        .upload-preview {
+          width: 64px;
+          height: 64px;
+          border-radius: 8px;
+          object-fit: cover;
+        }
+
+        .upload-clear {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          font-size: 11px;
+          color: #DC2626;
+          background: none;
+          border: none;
+          cursor: pointer;
+          margin-top: 4px;
+        }
+
+        .review-grid {
+          display: grid;
+          gap: 20px;
+        }
+
+        .review-block {
+          border: 1px solid #E5E7EB;
+          border-radius: 8px;
+          overflow: hidden;
+        }
+
+        .review-block-title {
+          background: #F9FAFB;
+          padding: 10px 14px;
+          font-size: 12px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          color: #6B7280;
+        }
+
+        .review-rows {
+          padding: 12px 14px;
+        }
+
+        .review-row {
+          display: flex;
+          justify-content: space-between;
+          gap: 16px;
+          padding: 8px 0;
+          border-bottom: 1px solid #F3F4F6;
+          font-size: 13px;
+        }
+
+        .review-row:last-child {
+          border-bottom: none;
+        }
+
+        .review-row dt {
+          color: #6B7280;
+          font-weight: 500;
+        }
+
+        .review-row dd {
+          color: #0C0C0C;
+          font-weight: 600;
+          text-align: right;
+        }
+
+        .submitted-banner {
+          background: #D1FAE5;
+          border: 1px solid #A7F3D0;
+          color: #065F46;
+          border-radius: 8px;
+          padding: 14px 16px;
+          font-size: 14px;
+          font-weight: 600;
+          margin-bottom: 20px;
+        }
+
+        .pend-loading {
+          text-align: center;
+          padding: 60px 20px;
+          color: #6B7280;
+          font-size: 14px;
+        }
+
+        .pend-spinner {
+          width: 32px;
+          height: 32px;
+          border: 3px solid #E5E7EB;
+          border-top-color: #1C5C38;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+          margin: 0 auto 12px;
+        }
+
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+
+        .pend-toast {
+          position: fixed;
+          bottom: 24px;
+          right: 24px;
+          z-index: 200;
+          padding: 12px 18px;
+          border-radius: 8px;
+          font-size: 13px;
+          font-weight: 600;
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+        }
+
+        .pend-toast.success {
+          background: #D1FAE5;
+          color: #065F46;
+        }
+
+        .pend-toast.error {
+          background: #FEE2E2;
+          color: #991B1B;
+        }
+
+        @media (max-width: 768px) {
+          .form-grid-2,
+          .form-grid-4,
+          .upload-grid {
+            grid-template-columns: 1fr;
+          }
+          .pend-step-label {
+            font-size: 9px;
+            max-width: 64px;
+          }
+          .form-card {
+            padding: 20px 16px;
+          }
         }
       `}</style>
 
-      {/* ===== NAVBAR ===== */}
-      <nav id="lp-navbar">
-        <div className="container">
-          <div className="nav-inner">
-            <a href="/" className="nav-logo">
-              SMK <span>Citra Negara</span>
-            </a>
-            <ul className="nav-links">
-              <li><a href="#jurusan">Jurusan</a></li>
-              <li><a href="#alur">Alur Daftar</a></li>
-              <li><a href="#tentang">Tentang</a></li>
-              <li><a href="#kontak">Kontak</a></li>
-            </ul>
-            <Link href="/register" className="btn-primary" style={{ fontSize: "0.85rem", padding: "12px 22px" }}>
-              Daftar Sekarang
-            </Link>
-          </div>
-        </div>
-      </nav>
-
-      {/* ===== HERO ===== */}
-      <section style={{ paddingTop: 0 }}>
-        <div className="container">
-          <div className="hero">
-            <div className="hero-left">
-              <div className="hero-badge">Penerimaan Murid Baru 2025/2026</div>
-              <h1>Wujudkan Mimpimu Bersama SMK Citra Negara</h1>
-              <p>
-                Pilih jurusan sesuai passion-mu, daftar online dengan mudah, dan mulai
-                perjalanan karier digitalmu bersama ribuan alumni sukses kami.
-              </p>
-              <div className="hero-ctas">
-                <Link href="/register" className="btn-primary">Daftar PPDB →</Link>
-                <a href="#alur" className="btn-outline">Lihat Alur</a>
-              </div>
-            </div>
-
-            <div className="hero-right">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img className="hero-photo hero-photo-1"
-                src="https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=400&h=500&fit=crop&q=80"
-                alt="Siswa belajar" />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img className="hero-photo hero-photo-2"
-                src="https://images.unsplash.com/photo-1580582932707-520afc8711b3?w=400&h=400&fit=crop&q=80"
-                alt="Lab komputer" />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img className="hero-photo hero-photo-3"
-                src="https://images.unsplash.com/photo-1571260899304-425eee4c7efc?w=400&h=500&fit=crop&q=80"
-                alt="Siswa di kelas" />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img className="hero-photo hero-photo-4"
-                src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=500&h=400&fit=crop&q=80"
-                alt="Kerja tim" />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img className="hero-photo hero-photo-5"
-                src="https://images.unsplash.com/photo-1560785496-3c9d5ec3cdf7?w=400&h=440&fit=crop&q=80"
-                alt="Siswa tersenyum" />
-
-              <div className="hero-badge-float">
-                <div className="dot">
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#1C5C38" strokeWidth="2.5">
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                    <circle cx="9" cy="7" r="4" />
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                  </svg>
+      <div className="pend-stepper-wrap" data-animate data-delay="0">
+        <div className="pend-stepper">
+          {STEPS.map((label, i) => {
+            const num = i + 1;
+            const isDone = num < step;
+            const isActive = num === step;
+            return (
+              <div key={label} className="pend-step-item">
+                <div className={`pend-step-line${isDone ? " done" : ""}`} />
+                <div
+                  className={`pend-step-circle${
+                    isDone ? " done" : isActive ? " active" : " pending"
+                  }`}
+                >
+                  {isDone ? <Check size={16} strokeWidth={3} /> : num}
                 </div>
-                <div>
-                  <div className="num">1.240+</div>
-                  <div className="lbl">Pendaftar Tahun Ini</div>
-                </div>
+                <span
+                  className={`pend-step-label${isActive ? " active" : ""}`}
+                >
+                  {label}
+                </span>
               </div>
-            </div>
-          </div>
+            );
+          })}
         </div>
-      </section>
-
-      {/* ===== MARQUEE 1 ===== */}
-      <div className="marquee-section">
-        <div className="marquee-track">
-          {["TKJ", "PPLG", "MPLB", "Teknik", "Digital", "Kreatif", "TKJ", "PPLG", "MPLB", "Teknik", "Digital", "Kreatif"].map((item, i) => (
-            <div className="marquee-item" key={i}>
-              {item}<span className="marquee-dot" />
-            </div>
-          ))}
-        </div>
+        <p className="pend-progress-text">
+          Tahap {step} dari {STEPS.length}
+        </p>
       </div>
 
-      {/* ===== CHALLENGES ===== */}
-      <section className="challenges">
-        <div className="container">
-          <div className="challenges-inner">
-            <div className="reveal">
-              <div className="section-label">Tantangan Nyata</div>
-              <h2>Masalah yang Sering Dihadapi Calon Siswa</h2>
-              <p className="challenges-desc">
-                Kami paham proses masuk sekolah bisa terasa membingungkan.
-                SMK Citra Negara hadir sebagai solusi lengkap untuk kamu.
-              </p>
-
-              <div className="challenge-card reveal reveal-delay-1">
-                <div className="challenge-icon">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="10" />
-                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-                    <line x1="12" y1="17" x2="12.01" y2="17" />
-                  </svg>
-                </div>
-                <div>
-                  <div className="challenge-title">Bingung pilih jurusan?</div>
-                  <div className="challenge-text">
-                    Kami punya 3 jurusan unggulan dengan jalur karier yang jelas.
-                    Konsultasi gratis tersedia untuk bantu kamu memilih.
-                  </div>
-                </div>
-              </div>
-
-              <div className="challenge-card reveal reveal-delay-2">
-                <div className="challenge-icon">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <line x1="12" y1="1" x2="12" y2="23" />
-                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                  </svg>
-                </div>
-                <div>
-                  <div className="challenge-title">Khawatir soal biaya?</div>
-                  <div className="challenge-text">
-                    Tersedia beasiswa prestasi dan program KIP-SMK untuk semua
-                    siswa yang memenuhi syarat.
-                  </div>
-                </div>
-              </div>
-
-              <div className="challenge-card reveal reveal-delay-3">
-                <div className="challenge-icon">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                    <polyline points="14 2 14 8 20 8" />
-                    <line x1="16" y1="13" x2="8" y2="13" />
-                    <line x1="16" y1="17" x2="8" y2="17" />
-                  </svg>
-                </div>
-                <div>
-                  <div className="challenge-title">Proses daftar yang rumit?</div>
-                  <div className="challenge-text">
-                    Pendaftaran online 4 langkah simpel, dokumen digital, dan
-                    pantau status real-time dari HP kamu.
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="challenges-right reveal">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img className="challenges-img"
-                src="https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=700&h=800&fit=crop&q=80"
-                alt="Siswa belajar" />
-              <div className="stat-float">
-                <div className="big">98%</div>
-                <div className="lbl">Tingkat Keterserapan Kerja</div>
-              </div>
-            </div>
+      <div className="form-card" data-animate data-delay="100">
+        {alreadySubmitted && (
+          <div className="submitted-banner">
+            Pendaftaran Anda sudah dikirim dan sedang diproses.
           </div>
-        </div>
-      </section>
+        )}
 
-      {/* ===== JURUSAN ===== */}
-      <section className="jurusan" id="jurusan">
-        <div className="container">
-          <div className="jurusan-header reveal">
-            <div className="section-label">Program Studi</div>
-            <h2>3 Jurusan Unggulan<br />untuk Masa Depanmu</h2>
-          </div>
-
-          <div>
-            {[
-              {
-                kode: "TKJ",
-                nama: "Teknik Komputer & Jaringan",
-                desc: "Kuasai infrastruktur jaringan, keamanan siber, dan administrasi sistem. Siap kerja di bidang IT support dan network engineering.",
-                img: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&h=340&fit=crop&q=80",
-                delay: "",
-              },
-              {
-                kode: "PPLG",
-                nama: "Pengembangan Perangkat Lunak & GIM",
-                desc: "Belajar full-stack development, mobile app, dan game development. Stack modern: React, Flutter, dan Unity.",
-                img: "https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=600&h=340&fit=crop&q=80",
-                delay: "reveal-delay-1",
-              },
-              {
-                kode: "MPLB",
-                nama: "Manajemen Perkantoran & Layanan Bisnis",
-                desc: "Administrasi profesional, manajemen dokumen digital, dan layanan pelanggan standar industri.",
-                img: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&h=340&fit=crop&q=80",
-                delay: "reveal-delay-2",
-              },
-            ].map((j) => (
-              <div className={`jurusan-item reveal ${j.delay}`} key={j.kode}>
-                <div className="jurusan-img-wrap">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img className="jurusan-img" src={j.img} alt={j.nama} />
-                  <div className="jurusan-badge">{j.kode}</div>
-                </div>
-                <div className="jurusan-info">
-                  <div className="jurusan-name">{j.nama}</div>
-                  <div className="jurusan-desc">{j.desc}</div>
-                  <div className="jurusan-arrow">Selengkapnya →</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ===== ALUR PENDAFTARAN ===== */}
-      <section className="alur" id="alur">
-        <div className="container">
-          <div className="alur-top">
-            <div className="alur-top-left reveal">
-              <div className="section-label">Cara Daftar</div>
-              <h2>Alur Pendaftaran<br />yang Simpel & Cepat</h2>
-            </div>
-            <div className="reveal">
-              <Link href="/register" className="btn-primary">Mulai Daftar →</Link>
-            </div>
-          </div>
-
-          <div>
-            {[
-              {
-                num: "01",
-                title: "Buat Akun & Isi Data Diri",
-                desc: "Daftar dengan email aktif, isi data diri lengkap termasuk NIK dan NISN. Sistem akan verifikasi data kamu secara otomatis.",
-                delay: "",
-              },
-              {
-                num: "02",
-                title: "Pilih Jurusan & Upload Dokumen",
-                desc: "Pilih jurusan impianmu dan upload dokumen yang diperlukan: foto, ijazah/SKL, rapor, dan KK. Semua bisa dilakukan dari HP.",
-                delay: "reveal-delay-1",
-              },
-              {
-                num: "03",
-                title: "Verifikasi & Seleksi Berkas",
-                desc: "Tim kami memverifikasi berkas dalam 1–3 hari kerja. Kamu bisa pantau status pendaftaran secara real-time di dashboard.",
-                delay: "reveal-delay-2",
-              },
-              {
-                num: "04",
-                title: "Pengumuman & Daftar Ulang",
-                desc: "Hasil seleksi diumumkan secara online. Jika diterima, lakukan daftar ulang dan lengkapi administrasi untuk memulai tahun ajaran baru.",
-                delay: "reveal-delay-3",
-              },
-            ].map((s) => (
-              <div className={`alur-step reveal ${s.delay}`} key={s.num}>
-                <div className="step-num">{s.num}</div>
-                <div className="step-divider" />
-                <div className="step-content">
-                  <div className="step-title">{s.title}</div>
-                  <div className="step-desc">{s.desc}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ===== STATISTIK ===== */}
-      <section className="stats" id="tentang">
-        <div className="container">
-          <div className="section-label stats-label reveal">Siapa Kami</div>
-          <h2 className="reveal">Angka yang Berbicara<br />untuk Diri Kami</h2>
-          <div className="stats-grid">
-            {[
-              { num: "20", suffix: "+", label: "Tahun Berdiri" },
-              { num: "1.5k", suffix: "+", label: "Alumni Sukses" },
-              { num: "98", suffix: "%", label: "Keterserapan Kerja" },
-              { num: "45", suffix: "+", label: "Mitra Industri" },
-            ].map((s, i) => (
-              <div className={`stat-item reveal${i > 0 ? ` reveal-delay-${i}` : ""}`} key={s.label}>
-                <div className="stat-num">
-                  {s.num}<span>{s.suffix}</span>
-                </div>
-                <div className="stat-lbl">{s.label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ===== MARQUEE 2 ===== */}
-      <div className="marquee-section-2">
-        <div className="marquee-track-2">
-          {["Teknik", "Kreatif", "Bisnis", "Digital", "Desain", "Jaringan", "Pemasaran", "Teknik", "Kreatif", "Bisnis", "Digital", "Desain", "Jaringan", "Pemasaran"].map((item, i) => (
-            <div className="marquee-item-2" key={i}>
-              {item}<span className="marquee-dot-2" />
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ===== TESTIMONIAL ===== */}
-      <section className="testimonial">
-        <div className="container">
-          <div className="reveal">
-            <div className="section-label">Kata Alumni</div>
-            <h2>Dipercaya Ribuan<br />Alumni di Seluruh Indonesia</h2>
-          </div>
-        </div>
-        <div style={{ marginTop: "60px", padding: "0 5vw" }}>
-          <div className="testi-track-wrap">
-            <div className="testi-track">
-              {[
-                {
-                  quote: "Berkat PPLG di SMK Citra Negara, gue langsung diterima kerja di startup tech sebelum lulus. Kurikulumnya relevan banget sama dunia industri sekarang.",
-                  name: "Rizky Fadillah",
-                  meta: "Alumni PPLG · 2023 · Junior Dev",
-                  img: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=80&h=80&fit=crop&q=80",
-                },
-                {
-                  quote: "Proses daftarnya gampang banget, semua online. Guru-gurunya juga supportif. Sekarang gue udah jadi teknisi jaringan di perusahaan BUMN.",
-                  name: "Dimas Ardiansyah",
-                  meta: "Alumni TKJ · 2022 · Network Engineer",
-                  img: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=80&h=80&fit=crop&q=80",
-                },
-                {
-                  quote: "MPLB kasih gue skill administrasi digital yang langsung kepake. Magang di perusahaan multinasional waktu kelas 12, dan langsung ditawari kerja setelah lulus.",
-                  name: "Nadia Syahputri",
-                  meta: "Alumni MPLB · 2023 · Admin Executive",
-                  img: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&h=80&fit=crop&q=80",
-                },
-                {
-                  quote: "Fasilitas lab-nya lengkap banget. Gue bisa langsung praktek jaringan real di sekolah, jadi waktu magang udah nggak kagok sama sekali.",
-                  name: "Bagas Pratama",
-                  meta: "Alumni TKJ · 2022 · IT Support",
-                  img: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&fit=crop&q=80",
-                },
-                {
-                  quote: "Gurunya berpengalaman dari industri langsung. Ilmu yang gue dapet di PPLG langsung applicable waktu kerja, bukan cuma teori doang.",
-                  name: "Siti Rahayu",
-                  meta: "Alumni PPLG · 2021 · Frontend Developer",
-                  img: "https://images.unsplash.com/photo-1494790108755-2616b612b4c0?w=80&h=80&fit=crop&q=80",
-                },
-                // duplicate for seamless loop
-                {
-                  quote: "Berkat PPLG di SMK Citra Negara, gue langsung diterima kerja di startup tech sebelum lulus. Kurikulumnya relevan banget sama dunia industri sekarang.",
-                  name: "Rizky Fadillah",
-                  meta: "Alumni PPLG · 2023 · Junior Dev",
-                  img: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=80&h=80&fit=crop&q=80",
-                },
-                {
-                  quote: "Proses daftarnya gampang banget, semua online. Guru-gurunya juga supportif. Sekarang gue udah jadi teknisi jaringan di perusahaan BUMN.",
-                  name: "Dimas Ardiansyah",
-                  meta: "Alumni TKJ · 2022 · Network Engineer",
-                  img: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=80&h=80&fit=crop&q=80",
-                },
-              ].map((t, i) => (
-                <div className="testi-card" key={i}>
-                  <div className="testi-quote">&ldquo;{t.quote}&rdquo;</div>
-                  <div className="testi-author">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img className="testi-avatar" src={t.img} alt={t.name} />
-                    <div>
-                      <div className="testi-name">{t.name}</div>
-                      <div className="testi-jurusan">{t.meta}</div>
-                    </div>
-                  </div>
-                </div>
+        {errors.length > 0 && (
+          <div className="form-errors">
+            <ul>
+              {errors.map((e) => (
+                <li key={e}>{e}</li>
               ))}
-            </div>
+            </ul>
           </div>
-        </div>
-      </section>
+        )}
 
-      {/* ===== CTA FINAL ===== */}
-      <section className="cta-section" id="kontak">
-        <div className="container">
-          <div className="cta-inner">
-            <div className="reveal">
-              <div className="section-label cta-label">Siap Mulai?</div>
-              <h2>Mulai Langkah Pertamamu Hari Ini</h2>
-              <p>
-                Jangan tunda lagi. Kuota terbatas setiap tahunnya. Daftar sekarang
-                dan jadilah bagian dari generasi digital yang siap kerja.
+        <div key={step} className="form-card-inner">
+          {step === 1 && (
+            <>
+              <h2 className="form-section-title">Data Diri</h2>
+              <div className="form-grid-2">
+                <div className="form-group">
+                  <label htmlFor="nama_lengkap">Nama Lengkap</label>
+                  <input
+                    id="nama_lengkap"
+                    className="form-input"
+                    value={form.nama_lengkap}
+                    onChange={(e) => updateField("nama_lengkap", e.target.value)}
+                    disabled={alreadySubmitted}
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="nama_panggilan">Nama Panggilan</label>
+                  <input
+                    id="nama_panggilan"
+                    className="form-input"
+                    value={form.nama_panggilan}
+                    onChange={(e) => updateField("nama_panggilan", e.target.value)}
+                    disabled={alreadySubmitted}
+                  />
+                </div>
+              </div>
+              <div className="form-grid-2">
+                <div className="form-group">
+                  <label htmlFor="nisn">NISN</label>
+                  <input
+                    id="nisn"
+                    className="form-input"
+                    value={form.nisn}
+                    onChange={(e) =>
+                      updateField("nisn", e.target.value.replace(/\D/g, "").slice(0, 10))
+                    }
+                    disabled={alreadySubmitted}
+                    inputMode="numeric"
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="nik">NIK</label>
+                  <input
+                    id="nik"
+                    className="form-input"
+                    value={form.nik}
+                    onChange={(e) =>
+                      updateField("nik", e.target.value.replace(/\D/g, "").slice(0, 16))
+                    }
+                    disabled={alreadySubmitted}
+                    inputMode="numeric"
+                  />
+                </div>
+              </div>
+              <div className="form-grid-4">
+                <div className="form-group">
+                  <label htmlFor="tempat_lahir">Tempat Lahir</label>
+                  <input
+                    id="tempat_lahir"
+                    className="form-input"
+                    value={form.tempat_lahir}
+                    onChange={(e) => updateField("tempat_lahir", e.target.value)}
+                    disabled={alreadySubmitted}
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="tanggal_lahir">Tanggal Lahir</label>
+                  <input
+                    id="tanggal_lahir"
+                    type="date"
+                    className="form-input"
+                    value={form.tanggal_lahir}
+                    onChange={(e) => updateField("tanggal_lahir", e.target.value)}
+                    disabled={alreadySubmitted}
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="jenis_kelamin">Jenis Kelamin</label>
+                  <select
+                    id="jenis_kelamin"
+                    className="form-select"
+                    value={form.jenis_kelamin}
+                    onChange={(e) =>
+                      updateField("jenis_kelamin", e.target.value as "" | "L" | "P")
+                    }
+                    disabled={alreadySubmitted}
+                  >
+                    <option value="">Pilih</option>
+                    <option value="L">Laki-laki</option>
+                    <option value="P">Perempuan</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label htmlFor="agama">Agama</label>
+                  <select
+                    id="agama"
+                    className="form-select"
+                    value={form.agama}
+                    onChange={(e) => updateField("agama", e.target.value)}
+                    disabled={alreadySubmitted}
+                  >
+                    <option value="">Pilih</option>
+                    {AGAMA_OPTIONS.map((a) => (
+                      <option key={a} value={a}>
+                        {a}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="form-grid-2">
+                <div className="form-group">
+                  <label htmlFor="jurusan_id">Pilihan Jurusan</label>
+                  <select
+                    id="jurusan_id"
+                    className="form-select"
+                    value={form.jurusan_id}
+                    onChange={(e) => updateField("jurusan_id", e.target.value)}
+                    disabled={alreadySubmitted}
+                  >
+                    <option value="">Pilih jurusan</option>
+                    {jurusanList.map((j) => (
+                      <option key={j.id} value={j.id}>
+                        {j.kode} — {j.nama}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label htmlFor="asal_sekolah">Asal Sekolah</label>
+                  <input
+                    id="asal_sekolah"
+                    className="form-input"
+                    value={form.asal_sekolah}
+                    onChange={(e) => updateField("asal_sekolah", e.target.value)}
+                    disabled={alreadySubmitted}
+                  />
+                </div>
+              </div>
+              <div className="form-group">
+                <label htmlFor="no_pribadi">Nomor HP Pribadi</label>
+                <input
+                  id="no_pribadi"
+                  className="form-input"
+                  value={form.no_pribadi}
+                  onChange={(e) => updateField("no_pribadi", e.target.value)}
+                  disabled={alreadySubmitted}
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="alamat_lengkap">Alamat Lengkap</label>
+                <textarea
+                  id="alamat_lengkap"
+                  className="form-textarea"
+                  value={form.alamat_lengkap}
+                  onChange={(e) => updateField("alamat_lengkap", e.target.value)}
+                  disabled={alreadySubmitted}
+                />
+              </div>
+            </>
+          )}
+
+          {step === 2 && (
+            <>
+              <h2 className="form-section-title">Data Akademik</h2>
+              <p style={{ fontSize: 13, color: "#6B7280", marginBottom: 16 }}>
+                Pastikan NISN dan NIK sesuai dokumen resmi sekolah.
               </p>
-              <div className="cta-buttons">
-                <Link href="/register" className="btn-white">Daftar Sekarang →</Link>
-                <a href="mailto:hello@smkdigital.sch.id" className="btn-outline-white">
-                  Hubungi Kami
-                </a>
+              <div className="form-grid-2">
+                <div className="form-group">
+                  <label htmlFor="nisn2">NISN (10 digit)</label>
+                  <input
+                    id="nisn2"
+                    className="form-input"
+                    value={form.nisn}
+                    onChange={(e) =>
+                      updateField("nisn", e.target.value.replace(/\D/g, "").slice(0, 10))
+                    }
+                    disabled={alreadySubmitted}
+                    inputMode="numeric"
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="nik2">NIK (16 digit)</label>
+                  <input
+                    id="nik2"
+                    className="form-input"
+                    value={form.nik}
+                    onChange={(e) =>
+                      updateField("nik", e.target.value.replace(/\D/g, "").slice(0, 16))
+                    }
+                    disabled={alreadySubmitted}
+                    inputMode="numeric"
+                  />
+                </div>
               </div>
-            </div>
-            <div className="cta-deco reveal">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="https://images.unsplash.com/photo-1571260899304-425eee4c7efc?w=520&h=520&fit=crop&q=80"
-                alt="Siswa SMK Citra Negara"
-              />
-              <div className="cta-deco-badge">✓ Pendaftaran Dibuka</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ===== FOOTER ===== */}
-      <footer>
-        <div className="container">
-          <div className="footer-top">
-            <div>
-              <div className="footer-logo">SMK <span>Citra Negara</span></div>
-              <div className="footer-tagline">
-                Mencetak generasi digital siap kerja. Pilih jurusanmu, raih masa depanmu.
-                Jl. Raya Tanah Baru No.99 Beji, Depok 16421.
+              <div className="form-grid-2">
+                <div className="form-group">
+                  <label htmlFor="asal_sekolah2">Asal Sekolah</label>
+                  <input
+                    id="asal_sekolah2"
+                    className="form-input"
+                    value={form.asal_sekolah}
+                    onChange={(e) => updateField("asal_sekolah", e.target.value)}
+                    disabled={alreadySubmitted}
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="jurusan_id2">Pilihan Jurusan</label>
+                  <select
+                    id="jurusan_id2"
+                    className="form-select"
+                    value={form.jurusan_id}
+                    onChange={(e) => updateField("jurusan_id", e.target.value)}
+                    disabled={alreadySubmitted}
+                  >
+                    <option value="">Pilih jurusan</option>
+                    {jurusanList.map((j) => (
+                      <option key={j.id} value={j.id}>
+                        {j.kode} — {j.nama}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <a href="mailto:hello@smkdigital.sch.id" className="footer-email">
-                hello@smkdigital.sch.id
-              </a>
+            </>
+          )}
+
+          {step === 3 && (
+            <>
+              <h2 className="form-section-title">Data Orang Tua</h2>
+              <div className="form-grid-2">
+                <div className="form-group">
+                  <label htmlFor="nama_ayah">Nama Ayah</label>
+                  <input
+                    id="nama_ayah"
+                    className="form-input"
+                    value={form.nama_ayah}
+                    onChange={(e) => updateField("nama_ayah", e.target.value)}
+                    disabled={alreadySubmitted}
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="nama_ibu">Nama Ibu</label>
+                  <input
+                    id="nama_ibu"
+                    className="form-input"
+                    value={form.nama_ibu}
+                    onChange={(e) => updateField("nama_ibu", e.target.value)}
+                    disabled={alreadySubmitted}
+                  />
+                </div>
+              </div>
+              <div className="form-grid-2">
+                <div className="form-group">
+                  <label htmlFor="no_ortu">Nomor HP Orang Tua</label>
+                  <input
+                    id="no_ortu"
+                    className="form-input"
+                    value={form.no_ortu}
+                    onChange={(e) => updateField("no_ortu", e.target.value)}
+                    disabled={alreadySubmitted}
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="pekerjaan_ayah">Pekerjaan Ayah</label>
+                  <input
+                    id="pekerjaan_ayah"
+                    className="form-input"
+                    value={form.pekerjaan_ayah}
+                    onChange={(e) => updateField("pekerjaan_ayah", e.target.value)}
+                    disabled={alreadySubmitted}
+                  />
+                </div>
+              </div>
+              <div className="form-group">
+                <label htmlFor="pekerjaan_ibu">Pekerjaan Ibu</label>
+                <input
+                  id="pekerjaan_ibu"
+                  className="form-input"
+                  value={form.pekerjaan_ibu}
+                  onChange={(e) => updateField("pekerjaan_ibu", e.target.value)}
+                  disabled={alreadySubmitted}
+                />
+              </div>
+            </>
+          )}
+
+          {step === 4 && (
+            <>
+              <h2 className="form-section-title">Upload Berkas</h2>
+              <div className="upload-grid">
+                {(["foto", "ijazah", "rapor", "kk"] as BerkasKey[]).map((key) => {
+                  const preview = berkasPreviews[key];
+                  const hasFile = !!(preview || berkasUrls[key] || berkasFiles[key]);
+                  return (
+                    <div key={key}>
+                      <input
+                        ref={(el) => {
+                          fileInputRefs.current[key] = el;
+                        }}
+                        type="file"
+                        accept="image/*,.pdf"
+                        className="hidden"
+                        style={{ display: "none" }}
+                        onChange={(e) =>
+                          handleBerkasSelect(key, e.target.files?.[0] ?? null)
+                        }
+                      />
+                      <div
+                        className={`upload-zone${dragBerkas === key ? " drag-over" : ""}${hasFile ? " has-file" : ""}`}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          setDragBerkas(key);
+                        }}
+                        onDragLeave={() => setDragBerkas(null)}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          setDragBerkas(null);
+                          handleBerkasSelect(key, e.dataTransfer.files?.[0] ?? null);
+                        }}
+                        onClick={() => fileInputRefs.current[key]?.click()}
+                      >
+                        {preview || berkasUrls[key] ? (
+                          key === "foto" && (preview || berkasUrls[key])?.match(/\.(jpg|jpeg|png|webp|gif)/i) ? (
+                            <img
+                              src={preview || berkasUrls[key]}
+                              alt={BERKAS_LABELS[key]}
+                              className="upload-preview"
+                            />
+                          ) : (
+                            <FileText size={32} color="#1C5C38" />
+                          )
+                        ) : (
+                          <Upload size={28} color="#6B7280" />
+                        )}
+                        <p>{BERKAS_LABELS[key]}</p>
+                        <span>Seret file atau klik · maks. 5 MB</span>
+                      </div>
+                      {hasFile && !alreadySubmitted && (
+                        <button
+                          type="button"
+                          className="upload-clear"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            clearBerkas(key);
+                          }}
+                        >
+                          <X size={12} /> Hapus
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {step === 5 && (
+            <>
+              <h2 className="form-section-title">Review & Kirim</h2>
+              <p style={{ fontSize: 13, color: "#6B7280", marginBottom: 20 }}>
+                Periksa kembali seluruh data sebelum mengirim pendaftaran.
+              </p>
+              <div className="review-grid">
+                <div className="review-block">
+                  <div className="review-block-title">Data Diri</div>
+                  <dl className="review-rows">
+                    <div className="review-row">
+                      <dt>Nama Lengkap</dt>
+                      <dd>{form.nama_lengkap || "—"}</dd>
+                    </div>
+                    <div className="review-row">
+                      <dt>Nama Panggilan</dt>
+                      <dd>{form.nama_panggilan || "—"}</dd>
+                    </div>
+                    <div className="review-row">
+                      <dt>TTL</dt>
+                      <dd>
+                        {form.tempat_lahir || "—"}
+                        {form.tanggal_lahir
+                          ? `, ${new Date(form.tanggal_lahir).toLocaleDateString("id-ID")}`
+                          : ""}
+                      </dd>
+                    </div>
+                    <div className="review-row">
+                      <dt>Jenis Kelamin</dt>
+                      <dd>
+                        {form.jenis_kelamin === "L"
+                          ? "Laki-laki"
+                          : form.jenis_kelamin === "P"
+                            ? "Perempuan"
+                            : "—"}
+                      </dd>
+                    </div>
+                    <div className="review-row">
+                      <dt>Agama</dt>
+                      <dd>{form.agama || "—"}</dd>
+                    </div>
+                    <div className="review-row">
+                      <dt>Alamat</dt>
+                      <dd>{form.alamat_lengkap || "—"}</dd>
+                    </div>
+                    <div className="review-row">
+                      <dt>No. HP</dt>
+                      <dd>{form.no_pribadi || "—"}</dd>
+                    </div>
+                  </dl>
+                </div>
+
+                <div className="review-block">
+                  <div className="review-block-title">Data Akademik</div>
+                  <dl className="review-rows">
+                    <div className="review-row">
+                      <dt>NISN</dt>
+                      <dd>{form.nisn || "—"}</dd>
+                    </div>
+                    <div className="review-row">
+                      <dt>NIK</dt>
+                      <dd>{form.nik || "—"}</dd>
+                    </div>
+                    <div className="review-row">
+                      <dt>Asal Sekolah</dt>
+                      <dd>{form.asal_sekolah || "—"}</dd>
+                    </div>
+                    <div className="review-row">
+                      <dt>Jurusan</dt>
+                      <dd>{jurusanName}</dd>
+                    </div>
+                  </dl>
+                </div>
+
+                <div className="review-block">
+                  <div className="review-block-title">Orang Tua</div>
+                  <dl className="review-rows">
+                    <div className="review-row">
+                      <dt>Nama Ayah</dt>
+                      <dd>{form.nama_ayah || "—"}</dd>
+                    </div>
+                    <div className="review-row">
+                      <dt>Nama Ibu</dt>
+                      <dd>{form.nama_ibu || "—"}</dd>
+                    </div>
+                    <div className="review-row">
+                      <dt>No. HP Ortu</dt>
+                      <dd>{form.no_ortu || "—"}</dd>
+                    </div>
+                    <div className="review-row">
+                      <dt>Pekerjaan Ayah</dt>
+                      <dd>{form.pekerjaan_ayah || "—"}</dd>
+                    </div>
+                    <div className="review-row">
+                      <dt>Pekerjaan Ibu</dt>
+                      <dd>{form.pekerjaan_ibu || "—"}</dd>
+                    </div>
+                  </dl>
+                </div>
+
+                <div className="review-block">
+                  <div className="review-block-title">Berkas</div>
+                  <dl className="review-rows">
+                    {(["foto", "ijazah", "rapor", "kk"] as BerkasKey[]).map((key) => (
+                      <div className="review-row" key={key}>
+                        <dt>{BERKAS_LABELS[key]}</dt>
+                        <dd>
+                          {berkasUrls[key] || berkasFiles[key]
+                            ? "✓ Terunggah"
+                            : "Belum"}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              </div>
+            </>
+          )}
+
+          {!alreadySubmitted && (
+            <div className="form-actions">
+              {step > 1 ? (
+                <button
+                  type="button"
+                  className="btn-back"
+                  onClick={handleBack}
+                  disabled={saving || submitting}
+                >
+                  <ArrowLeft size={16} />
+                  Kembali
+                </button>
+              ) : (
+                <span />
+              )}
+              {step < 5 ? (
+                <button
+                  type="button"
+                  className="btn-next"
+                  onClick={handleNext}
+                  disabled={saving}
+                >
+                  {saving ? "Menyimpan..." : "Lanjut"}
+                  <ArrowRight size={16} />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn-next"
+                  onClick={handleSubmit}
+                  disabled={submitting}
+                >
+                  {submitting ? "Mengirim..." : "Kirim Pendaftaran"}
+                  <ArrowRight size={16} />
+                </button>
+              )}
             </div>
-            <div>
-              <div className="footer-col-title">Halaman</div>
-              <ul className="footer-links">
-                <li><a href="#jurusan">Jurusan</a></li>
-                <li><a href="#alur">Alur Daftar</a></li>
-                <li><a href="#tentang">Tentang Kami</a></li>
-                <li><a href="#kontak">Kontak</a></li>
-                <li><Link href="/login">Login</Link></li>
-              </ul>
-            </div>
-            <div>
-              <div className="footer-col-title">Kontak</div>
-              <ul className="footer-links">
-                <li><a href="mailto:hello@smkdigital.sch.id">hello@smkdigital.sch.id</a></li>
-                <li><a href="tel:02177201052">(021) 77201052</a></li>
-                <li><a href="#">Instagram</a></li>
-                <li><a href="#">YouTube</a></li>
-              </ul>
-            </div>
-          </div>
-          <div className="footer-bottom">
-            <div className="footer-copy">© 2026 SMK Citra Negara. Semua hak dilindungi.</div>
-            <div className="footer-copy">Kebijakan Privasi · Syarat & Ketentuan</div>
-          </div>
+          )}
         </div>
-      </footer>
+      </div>
 
-      {/* ===== CLIENT SCRIPTS ===== */}
-      <script dangerouslySetInnerHTML={{ __html: `
-        // Navbar scroll effect
-        const navbar = document.getElementById('lp-navbar');
-        if (navbar) {
-          window.addEventListener('scroll', () => {
-            navbar.classList.toggle('scrolled', window.scrollY > 20);
-          });
-        }
-
-        // Scroll reveal
-        const reveals = document.querySelectorAll('.reveal');
-        const revealObserver = new IntersectionObserver((entries) => {
-          entries.forEach(entry => {
-            if (entry.isIntersecting) {
-              entry.target.classList.add('visible');
-              revealObserver.unobserve(entry.target);
-            }
-          });
-        }, { threshold: 0.12 });
-        reveals.forEach(el => revealObserver.observe(el));
-
-        // Smooth scroll
-        document.querySelectorAll('a[href^="#"]').forEach(a => {
-          a.addEventListener('click', e => {
-            const href = a.getAttribute('href');
-            if (href === '#') return;
-            const target = document.querySelector(href);
-            if (target) {
-              e.preventDefault();
-              target.scrollIntoView({ behavior: 'smooth' });
-            }
-          });
-        });
-      ` }} />
+      {toast && (
+        <div className={`pend-toast ${toast.type}`}>{toast.msg}</div>
+      )}
     </>
   );
 }
