@@ -14,6 +14,7 @@
 // ============================================================
 
 import Link from "next/link";
+import LandingFooter from "@/components/landing/footer";
 
 export default function LandingPage() {
   return (
@@ -372,24 +373,6 @@ export default function LandingPage() {
           padding:14px 18px;font-size:0.85rem;font-weight:700;
         }
 
-        /* ===== FOOTER ===== */
-        footer { background: #080808; padding: 80px 0 40px; }
-        .footer-top {
-          display:grid;grid-template-columns:2fr 1fr 1fr;gap:60px;
-          padding-bottom:60px;border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:40px;
-        }
-        .footer-logo { font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:1.15rem;color:white;letter-spacing:-0.02em;margin-bottom:16px; }
-        .footer-logo span { color: var(--accent); }
-        .footer-tagline { font-size:0.88rem;color:rgba(255,255,255,0.4);line-height:1.65;max-width:280px;margin-bottom:24px; }
-        .footer-email { font-size:0.85rem;color:rgba(255,255,255,0.55);text-decoration:none;transition:color 0.2s; }
-        .footer-email:hover { color: white; }
-        .footer-col-title { font-family:'Bricolage Grotesque',sans-serif;font-weight:700;color:rgba(255,255,255,0.6);font-size:0.8rem;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:20px; }
-        .footer-links { list-style:none;display:flex;flex-direction:column;gap:12px; }
-        .footer-links a { font-size:0.88rem;color:rgba(255,255,255,0.4);text-decoration:none;transition:color 0.2s; }
-        .footer-links a:hover { color: white; }
-        .footer-bottom { display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px; }
-        .footer-copy { font-size:0.82rem;color:rgba(255,255,255,0.25); }
-
         /* ===== RESPONSIVE ===== */
         @media (max-width: 900px) {
           .hero { grid-template-columns: 1fr; padding: 120px 0 60px; }
@@ -407,13 +390,11 @@ export default function LandingPage() {
           .stat-item { border-right:none;border-bottom:1px solid var(--border-dark); }
           .cta-inner { grid-template-columns: 1fr; padding: 48px; }
           .cta-deco { display: none; }
-          .footer-top { grid-template-columns: 1fr 1fr; }
           .nav-links { display: none; }
         }
 
         @media (max-width: 600px) {
           .stats-grid { grid-template-columns: 1fr 1fr; }
-          .footer-top { grid-template-columns: 1fr; }
           .alur-step { grid-template-columns: 60px 1px 1fr; gap: 0 20px; }
           .step-num { font-size: 2rem; }
           .hero-ctas { flex-direction: column; }
@@ -826,46 +807,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ===== FOOTER ===== */}
-      <footer>
-        <div className="container">
-          <div className="footer-top">
-            <div>
-              <div className="footer-logo">SMK <span>Citra Negara</span></div>
-              <div className="footer-tagline">
-                Mencetak generasi digital siap kerja. Pilih jurusanmu, raih masa depanmu.
-                Jl. Raya Tanah Baru No.99 Beji, Depok 16421.
-              </div>
-              <a href="mailto:hello@smkdigital.sch.id" className="footer-email">
-                hello@smkdigital.sch.id
-              </a>
-            </div>
-            <div>
-              <div className="footer-col-title">Halaman</div>
-              <ul className="footer-links">
-                <li><a href="#jurusan">Jurusan</a></li>
-                <li><a href="#alur">Alur Daftar</a></li>
-                <li><a href="#tentang">Tentang Kami</a></li>
-                <li><a href="#kontak">Kontak</a></li>
-                <li><Link href="/login">Login</Link></li>
-              </ul>
-            </div>
-            <div>
-              <div className="footer-col-title">Kontak</div>
-              <ul className="footer-links">
-                <li><a href="mailto:hello@smkdigital.sch.id">hello@smkdigital.sch.id</a></li>
-                <li><a href="tel:02177201052">(021) 77201052</a></li>
-                <li><a href="#">Instagram</a></li>
-                <li><a href="#">YouTube</a></li>
-              </ul>
-            </div>
-          </div>
-          <div className="footer-bottom">
-            <div className="footer-copy">© 2026 SMK Citra Negara. Semua hak dilindungi.</div>
-            <div className="footer-copy">Kebijakan Privasi · Syarat & Ketentuan</div>
-          </div>
-        </div>
-      </footer>
+      <LandingFooter />
 
       {/* ===== CLIENT SCRIPTS ===== */}
       <script dangerouslySetInnerHTML={{ __html: `
