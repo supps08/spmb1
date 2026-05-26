@@ -9,12 +9,20 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { Printer } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
 } from "recharts";
+import { useScrollAnimation } from "@/lib/useScrollAnimation";
 
 interface StatsSiswa {
   total: number;
@@ -42,9 +50,17 @@ interface TrendData {
 const HARI = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
 
 export default function LaporanPage() {
+  useScrollAnimation();
+
   const supabase = createClient();
 
-  const [stats, setStats] = useState<StatsSiswa>({ total: 0, diterima: 0, ditolak: 0, menunggu: 0, submitted: 0 });
+  const [stats, setStats] = useState<StatsSiswa>({
+    total: 0,
+    diterima: 0,
+    ditolak: 0,
+    menunggu: 0,
+    submitted: 0,
+  });
   const [rekap, setRekap] = useState<RekapJurusan[]>([]);
   const [trend, setTrend] = useState<TrendData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,17 +68,17 @@ export default function LaporanPage() {
 
   useEffect(() => {
     async function fetchAll() {
-      // Ambil pengaturan sistem
       const { data: peng } = await supabase
         .from("pengaturan_sistem")
         .select("key, value");
       if (peng) {
         const map: Record<string, string> = {};
-        peng.forEach(p => { map[p.key] = p.value ?? ""; });
+        peng.forEach((p) => {
+          map[p.key] = p.value ?? "";
+        });
         setPengaturan(map);
       }
 
-      // Ambil semua siswa yang sudah submit
       const { data: siswaData } = await supabase
         .from("siswa")
         .select("status, jurusan_id, created_at")
@@ -70,13 +86,12 @@ export default function LaporanPage() {
 
       if (siswaData) {
         const total = siswaData.length;
-        const diterima = siswaData.filter(s => s.status === "diterima").length;
-        const ditolak = siswaData.filter(s => s.status === "ditolak").length;
-        const menunggu = siswaData.filter(s => s.status === "menunggu").length;
-        const submitted = siswaData.filter(s => s.status === "submitted").length;
+        const diterima = siswaData.filter((s) => s.status === "diterima").length;
+        const ditolak = siswaData.filter((s) => s.status === "ditolak").length;
+        const menunggu = siswaData.filter((s) => s.status === "menunggu").length;
+        const submitted = siswaData.filter((s) => s.status === "submitted").length;
         setStats({ total, diterima, ditolak, menunggu, submitted });
 
-        // Tren 7 hari terakhir
         const trendMap: Record<string, number> = {};
         const today = new Date();
         for (let i = 6; i >= 0; i--) {
@@ -85,32 +100,44 @@ export default function LaporanPage() {
           const key = d.toISOString().split("T")[0];
           trendMap[key] = 0;
         }
-        siswaData.forEach(s => {
+        siswaData.forEach((s) => {
           const key = s.created_at?.split("T")[0];
           if (key && trendMap[key] !== undefined) {
             trendMap[key]++;
           }
         });
-        const trendArr: TrendData[] = Object.entries(trendMap).map(([date, jumlah]) => ({
-          hari: HARI[new Date(date).getDay()],
-          jumlah,
-        }));
+        const trendArr: TrendData[] = Object.entries(trendMap).map(
+          ([date, jumlah]) => ({
+            hari: HARI[new Date(date).getDay()],
+            jumlah,
+          })
+        );
         setTrend(trendArr);
       }
 
-      // Rekap per jurusan
       const { data: jurusanData } = await supabase
         .from("jurusan")
         .select("id, kode, nama, kuota")
         .eq("is_active", true);
 
       if (jurusanData && siswaData) {
-        const rekapArr: RekapJurusan[] = jurusanData.map(j => {
-          const siswaJurusan = siswaData.filter(s => s.jurusan_id === j.id);
-          const total = siswaJurusan.length;
-          const diterima = siswaJurusan.filter(s => s.status === "diterima").length;
-          const persen = j.kuota > 0 ? Math.round((diterima / j.kuota) * 100) : 0;
-          return { id: j.id, kode: j.kode, nama: j.nama, kuota: j.kuota, total, diterima, persen };
+        const rekapArr: RekapJurusan[] = jurusanData.map((j) => {
+          const siswaJurusan = siswaData.filter((s) => s.jurusan_id === j.id);
+          const totalJ = siswaJurusan.length;
+          const diterimaJ = siswaJurusan.filter(
+            (s) => s.status === "diterima"
+          ).length;
+          const persen =
+            j.kuota > 0 ? Math.round((diterimaJ / j.kuota) * 100) : 0;
+          return {
+            id: j.id,
+            kode: j.kode,
+            nama: j.nama,
+            kuota: j.kuota,
+            total: totalJ,
+            diterima: diterimaJ,
+            persen,
+          };
         });
         setRekap(rekapArr);
       }
@@ -121,7 +148,6 @@ export default function LaporanPage() {
     fetchAll();
   }, [supabase]);
 
-  // Hitung sisa hari tutup pendaftaran
   function sisaHari() {
     const tutup = pengaturan["tanggal_tutup"];
     if (!tutup) return null;
@@ -130,223 +156,457 @@ export default function LaporanPage() {
     return hari > 0 ? hari : 0;
   }
 
-  const maxTrend = Math.max(...trend.map(t => t.jumlah), 1);
+  const maxTrend = useMemo(
+    () => Math.max(...trend.map((t) => t.jumlah), 0),
+    [trend]
+  );
+
+  const sisa = sisaHari();
+  const tahunAjaran = pengaturan["tahun_ajaran"] || "2025/2026";
 
   return (
     <>
       <style>{`
-        .laporan-page { display: flex; flex-direction: column; gap: 20px; }
+        @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700;800&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap');
 
-        /* Stats */
+        .laporan-page {
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+          font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        .laporan-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 12px;
+        }
+
+        .laporan-title {
+          font-family: 'Bricolage Grotesque', sans-serif;
+          font-size: 20px;
+          font-weight: 700;
+          color: #0C0C0C;
+        }
+
+        .laporan-subtitle {
+          font-size: 13px;
+          color: #6B7280;
+          margin-top: 2px;
+        }
+
+        .print-only-title {
+          display: none;
+        }
+
+        .export-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          background: #1C5C38;
+          color: #fff;
+          border: none;
+          border-radius: 8px;
+          padding: 10px 18px;
+          font-family: inherit;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background 0.15s, transform 0.15s;
+        }
+
+        .export-btn:hover {
+          background: #2A7A4E;
+          transform: translateY(-1px);
+        }
+
         .stats-wrapper {
-          background: white;
+          background: #fff;
           border: 1px solid #E5E7EB;
           border-radius: 12px;
           display: grid;
           grid-template-columns: repeat(4, 1fr);
           overflow: hidden;
         }
+
         .stat-card-l {
           padding: 20px 24px;
           border-right: 1px solid #E5E7EB;
-          position: relative;
         }
-        .stat-card-l:last-child { border-right: none; }
-        .stat-card-l::after {
-          content: '';
-          position: absolute;
-          bottom: 0; left: 0; right: 0;
-          height: 3px;
+
+        .stat-card-l:last-child {
+          border-right: none;
         }
-        .stat-card-l.green::after { background: #1C5C38; }
-        .stat-card-l.red::after { background: #DC2626; }
-        .stat-card-l.gray::after { background: #6B7280; }
 
         .stat-label-l {
-          font-size: 0.68rem; font-weight: 600; color: #6B7280;
-          text-transform: uppercase; letter-spacing: 0.08em;
+          font-size: 12px;
+          font-weight: 600;
+          color: #6B7280;
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
           margin-bottom: 8px;
         }
+
         .stat-value-l {
           font-family: 'Bricolage Grotesque', sans-serif;
-          font-size: 2rem; font-weight: 800; color: #0C0C0C; line-height: 1;
-        }
-        .stat-value-l.red { color: #DC2626; }
-        .stat-icon-l {
-          position: absolute; top: 16px; right: 16px;
-          font-size: 2.5rem; opacity: 0.05;
+          font-size: 28px;
+          font-weight: 800;
+          color: #0C0C0C;
+          line-height: 1;
         }
 
-        /* Tabel rekap */
+        .stat-value-l.red {
+          color: #DC2626;
+        }
+
         .panel {
-          background: white; border: 1px solid #E5E7EB;
-          border-radius: 12px; overflow: hidden;
+          background: #fff;
+          border: 1px solid #E5E7EB;
+          border-radius: 12px;
+          overflow: hidden;
         }
-        .panel-header {
-          padding: 16px 20px; border-bottom: 1px solid #E5E7EB;
-        }
-        .panel-title { font-size: 0.92rem; font-weight: 600; color: #0C0C0C; }
-        .panel-subtitle { font-size: 0.78rem; color: #6B7280; margin-top: 2px; }
 
-        table { width: 100%; border-collapse: collapse; }
-        th {
-          text-align: left; padding: 10px 20px;
-          font-size: 0.7rem; font-weight: 600; color: #6B7280;
-          text-transform: uppercase; letter-spacing: 0.05em;
-          background: #F9FAFB; border-bottom: 1px solid #E5E7EB;
+        .panel-header {
+          padding: 16px 20px;
+          border-bottom: 1px solid #E5E7EB;
         }
-        td {
-          padding: 16px 20px; border-bottom: 1px solid #F3F4F6;
-          font-size: 0.87rem; color: #374151; vertical-align: middle;
+
+        .panel-title {
+          font-family: 'Bricolage Grotesque', sans-serif;
+          font-size: 15px;
+          font-weight: 700;
+          color: #0C0C0C;
         }
-        tr:last-child td { border-bottom: none; }
-        tr:hover td { background: #F9FAFB; }
+
+        .panel-subtitle {
+          font-size: 13px;
+          color: #6B7280;
+          margin-top: 2px;
+        }
+
+        .rekap-table {
+          width: 100%;
+          border-collapse: collapse;
+        }
+
+        .rekap-table th {
+          text-align: left;
+          padding: 12px 20px;
+          font-size: 12px;
+          font-weight: 600;
+          color: #6B7280;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          background: #F9FAFB;
+          border-bottom: 1px solid #E5E7EB;
+        }
+
+        .rekap-table td {
+          padding: 16px 20px;
+          border-bottom: 1px solid #F3F4F6;
+          font-size: 14px;
+          color: #374151;
+          vertical-align: middle;
+        }
+
+        .rekap-table tr:last-child td {
+          border-bottom: none;
+        }
+
+        .rekap-table tbody tr:hover td {
+          background: #F9FAFB;
+        }
 
         .jurusan-kode {
-          display: inline-block; padding: 3px 8px;
-          background: #EBF4EE; color: #1C5C38;
-          border-radius: 6px; font-size: 0.72rem; font-weight: 700;
-          margin-right: 8px; letter-spacing: 0.04em;
+          display: inline-block;
+          padding: 3px 8px;
+          background: #EBF4EE;
+          color: #1C5C38;
+          border-radius: 6px;
+          font-size: 11px;
+          font-weight: 700;
+          margin-right: 8px;
+          letter-spacing: 0.04em;
         }
-        .progress-wrap { display: flex; align-items: center; gap: 10px; }
-        .progress-track {
-          flex: 1; height: 6px; background: #E5E7EB;
-          border-radius: 9999px; overflow: hidden;
-        }
-        .progress-fill { height: 100%; background: #1C5C38; border-radius: 9999px; }
-        .progress-pct { font-size: 0.78rem; color: #6B7280; font-weight: 500; min-width: 36px; }
-        .status-aktif {
-          display: inline-flex; align-items: center; gap: 5px;
-          font-size: 0.75rem; font-weight: 600; color: #065F46;
-        }
-        .dot-aktif { width: 6px; height: 6px; background: #10B981; border-radius: 50%; }
 
-        /* Bottom row */
+        .progress-wrap {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .progress-track {
+          flex: 1;
+          height: 6px;
+          background: #E5E7EB;
+          border-radius: 9999px;
+          overflow: hidden;
+        }
+
+        .progress-fill {
+          height: 100%;
+          background: #1C5C38;
+          border-radius: 9999px;
+          transition: width 0.4s ease;
+        }
+
+        .progress-pct {
+          font-size: 12px;
+          color: #6B7280;
+          font-weight: 600;
+          min-width: 36px;
+        }
+
+        .progress-meta {
+          font-size: 11px;
+          color: #9CA3AF;
+          margin-top: 4px;
+        }
+
+        .status-aktif {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          font-size: 12px;
+          font-weight: 600;
+          color: #065F46;
+        }
+
+        .dot-aktif {
+          width: 6px;
+          height: 6px;
+          background: #10B981;
+          border-radius: 50%;
+        }
+
         .bottom-row {
           display: grid;
           grid-template-columns: 1fr 360px;
           gap: 20px;
         }
 
-        /* Chart */
         .chart-header {
-          display: flex; align-items: center;
-          justify-content: space-between; padding: 16px 20px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 16px 20px;
           border-bottom: 1px solid #E5E7EB;
         }
-        .chart-badge {
-          background: #F3F4F6; color: #374151;
-          border-radius: 9999px; padding: 4px 12px;
-          font-size: 0.75rem; font-weight: 500;
-        }
-        .chart-wrap { padding: 20px; height: 240px; }
 
-        /* Info card */
+        .chart-badge {
+          background: #F3F4F6;
+          color: #374151;
+          border-radius: 9999px;
+          padding: 4px 12px;
+          font-size: 12px;
+          font-weight: 600;
+        }
+
+        .chart-wrap {
+          padding: 20px;
+          height: 260px;
+        }
+
         .info-card {
-          background: #1C5C38; border-radius: 12px;
-          padding: 28px; color: white; position: relative; overflow: hidden;
-          display: flex; flex-direction: column; justify-content: space-between;
+          background: #1C5C38;
+          border-radius: 12px;
+          padding: 28px;
+          color: #fff;
+          position: relative;
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          min-height: 100%;
         }
-        .info-card::before {
-          content: '📅';
-          position: absolute; bottom: 16px; right: 20px;
-          font-size: 5rem; opacity: 0.08;
+
+        .info-card-deco {
+          position: absolute;
+          bottom: -20px;
+          right: -10px;
+          width: 120px;
+          height: 120px;
+          border-radius: 50%;
+          background: rgba(255, 255, 255, 0.06);
+          pointer-events: none;
         }
-        .info-card-title { font-size: 0.85rem; font-weight: 700; color: white; margin-bottom: 12px; }
-        .info-card-body { font-size: 0.85rem; color: rgba(255,255,255,0.8); line-height: 1.6; margin-bottom: 20px; flex: 1; }
+
+        .info-card-title {
+          font-family: 'Bricolage Grotesque', sans-serif;
+          font-size: 14px;
+          font-weight: 700;
+          margin-bottom: 12px;
+        }
+
         .info-card-days {
           font-family: 'Bricolage Grotesque', sans-serif;
-          font-size: 2.5rem; font-weight: 800; color: white; line-height: 1;
+          font-size: 40px;
+          font-weight: 800;
+          line-height: 1;
           margin-bottom: 4px;
         }
-        .info-card-days-label { font-size: 0.78rem; color: rgba(255,255,255,0.6); margin-bottom: 20px; }
+
+        .info-card-days-label {
+          font-size: 13px;
+          color: rgba(255, 255, 255, 0.7);
+          margin-bottom: 16px;
+        }
+
+        .info-card-body {
+          font-size: 14px;
+          color: rgba(255, 255, 255, 0.85);
+          line-height: 1.6;
+          margin-bottom: 20px;
+          flex: 1;
+        }
+
         .btn-jadwal {
           display: inline-block;
-          background: rgba(255,255,255,0.15);
-          border: 1px solid rgba(255,255,255,0.3);
-          color: white; border-radius: 8px;
-          padding: 10px 18px; font-size: 0.83rem; font-weight: 600;
-          cursor: pointer; text-decoration: none;
-          transition: background .2s; width: fit-content;
+          background: rgba(255, 255, 255, 0.15);
+          border: 1px solid rgba(255, 255, 255, 0.3);
+          color: #fff;
+          border-radius: 8px;
+          padding: 10px 18px;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          text-decoration: none;
+          transition: background 0.2s;
+          width: fit-content;
         }
-        .btn-jadwal:hover { background: rgba(255,255,255,0.25); }
 
-        /* Export btn */
-        .export-btn {
-          display: inline-flex; align-items: center; gap: 6px;
-          background: #1C5C38; color: white; border: none;
-          border-radius: 8px; padding: 8px 16px;
-          font-family: 'Plus Jakarta Sans', sans-serif;
-          font-size: 0.83rem; font-weight: 600; cursor: pointer;
-          transition: background .2s;
+        .btn-jadwal:hover {
+          background: rgba(255, 255, 255, 0.25);
         }
-        .export-btn:hover { background: #2A7A4E; }
 
-        .loading-state { text-align: center; padding: 60px; color: #6B7280; font-size: 0.85rem; }
+        .loading-state {
+          text-align: center;
+          padding: 60px;
+          color: #6B7280;
+          font-size: 14px;
+          background: #fff;
+          border: 1px solid #E5E7EB;
+          border-radius: 12px;
+        }
+
+        .loading-spinner {
+          width: 28px;
+          height: 28px;
+          border: 3px solid #E5E7EB;
+          border-top-color: #1C5C38;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+          margin: 0 auto 12px;
+        }
+
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
 
         @media (max-width: 900px) {
-          .stats-wrapper { grid-template-columns: repeat(2, 1fr); }
-          .stat-card-l { border-bottom: 1px solid #E5E7EB; }
-          .bottom-row { grid-template-columns: 1fr; }
+          .stats-wrapper {
+            grid-template-columns: repeat(2, 1fr);
+          }
+          .stat-card-l:nth-child(2) {
+            border-right: none;
+          }
+          .stat-card-l:nth-child(1),
+          .stat-card-l:nth-child(2) {
+            border-bottom: 1px solid #E5E7EB;
+          }
+          .bottom-row {
+            grid-template-columns: 1fr;
+          }
         }
+
         @media (max-width: 600px) {
-          .stats-wrapper { grid-template-columns: 1fr 1fr; }
+          .stats-wrapper {
+            grid-template-columns: 1fr;
+          }
+          .stat-card-l {
+            border-right: none;
+            border-bottom: 1px solid #E5E7EB;
+          }
+          .stat-card-l:last-child {
+            border-bottom: none;
+          }
         }
       `}</style>
 
-      <div className="laporan-page">
-        {/* Header + export */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
+      <div className="laporan-page" id="laporan-print-root">
+        <div className="print-only-title">
+          <h1>Laporan Penerimaan SPMB — {tahunAjaran}</h1>
+          <p>
+            Dicetak:{" "}
+            {new Date().toLocaleString("id-ID", {
+              day: "numeric",
+              month: "long",
+              year: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </p>
+        </div>
+
+        <div className="laporan-header" data-animate data-delay="0">
           <div>
-            <h2 style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: "1.15rem", fontWeight: 700, color: "#0C0C0C" }}>
-              Laporan Penerimaan
-            </h2>
-            <p style={{ fontSize: "0.8rem", color: "#6B7280", marginTop: "2px" }}>
-              Tahun Ajaran {pengaturan["tahun_ajaran"] || "2025/2026"}
-            </p>
+            <h1 className="laporan-title">Laporan</h1>
+            <p className="laporan-subtitle">Tahun Ajaran {tahunAjaran}</p>
           </div>
-          <button className="export-btn" onClick={() => window.print()}>
-            ⬇ Export PDF
+          <button
+            type="button"
+            className="export-btn no-print"
+            onClick={() => window.print()}
+          >
+            <Printer size={18} />
+            Export PDF
           </button>
         </div>
 
         {loading ? (
-          <div className="loading-state">⏳ Memuat data laporan...</div>
+          <div className="loading-state" data-animate data-delay="50">
+            <div className="loading-spinner" />
+            Memuat data laporan...
+          </div>
         ) : (
           <>
-            {/* Stats cards */}
-            <div className="stats-wrapper">
-              <div className="stat-card-l green">
+            <div className="stats-wrapper" data-animate data-delay="100">
+              <div className="stat-card-l">
                 <div className="stat-label-l">Total Pendaftar</div>
-                <div className="stat-value-l">{stats.total.toLocaleString("id-ID")}</div>
-                <div className="stat-icon-l">📋</div>
+                <div className="stat-value-l">
+                  {stats.total.toLocaleString("id-ID")}
+                </div>
               </div>
-              <div className="stat-card-l green">
+              <div className="stat-card-l">
                 <div className="stat-label-l">Diterima</div>
-                <div className="stat-value-l">{stats.diterima.toLocaleString("id-ID")}</div>
-                <div className="stat-icon-l">✅</div>
+                <div className="stat-value-l">
+                  {stats.diterima.toLocaleString("id-ID")}
+                </div>
               </div>
-              <div className="stat-card-l red">
+              <div className="stat-card-l">
                 <div className="stat-label-l">Ditolak</div>
-                <div className="stat-value-l red">{stats.ditolak.toLocaleString("id-ID")}</div>
-                <div className="stat-icon-l">❌</div>
+                <div className="stat-value-l red">
+                  {stats.ditolak.toLocaleString("id-ID")}
+                </div>
               </div>
-              <div className="stat-card-l gray">
+              <div className="stat-card-l">
                 <div className="stat-label-l">Menunggu Verifikasi</div>
-                <div className="stat-value-l">{(stats.menunggu + stats.submitted).toLocaleString("id-ID")}</div>
-                <div className="stat-icon-l">⏳</div>
+                <div className="stat-value-l">
+                  {(stats.menunggu + stats.submitted).toLocaleString("id-ID")}
+                </div>
               </div>
             </div>
 
-            {/* Tabel rekap jurusan */}
-            <div className="panel">
+            <div className="panel" data-animate data-delay="150">
               <div className="panel-header">
                 <div className="panel-title">Rekap per Jurusan</div>
                 <div className="panel-subtitle">
-                  Data statistik pendaftaran tahun ajaran {pengaturan["tahun_ajaran"] || "2025/2026"}
+                  Data statistik pendaftaran tahun ajaran {tahunAjaran}
                 </div>
               </div>
-              <table>
+              <table className="rekap-table">
                 <thead>
                   <tr>
                     <th>Jurusan</th>
@@ -359,36 +619,47 @@ export default function LaporanPage() {
                 <tbody>
                   {rekap.length === 0 ? (
                     <tr>
-                      <td colSpan={5} style={{ textAlign: "center", color: "#9CA3AF", padding: "32px" }}>
+                      <td
+                        colSpan={5}
+                        style={{
+                          textAlign: "center",
+                          color: "#9CA3AF",
+                          padding: "32px",
+                        }}
+                      >
                         Belum ada data pendaftar.
                       </td>
                     </tr>
                   ) : (
-                    rekap.map(j => (
+                    rekap.map((j) => (
                       <tr key={j.id}>
                         <td>
                           <span className="jurusan-kode">{j.kode}</span>
                           {j.nama}
                         </td>
                         <td style={{ fontWeight: 600 }}>{j.total}</td>
-                        <td style={{ color: "#1C5C38", fontWeight: 600 }}>{j.diterima}</td>
+                        <td style={{ color: "#1C5C38", fontWeight: 600 }}>
+                          {j.diterima}
+                        </td>
                         <td>
                           <div className="progress-wrap">
                             <div className="progress-track">
                               <div
                                 className="progress-fill"
-                                style={{ width: `${Math.min(j.persen, 100)}%` }}
+                                style={{
+                                  width: `${Math.min(j.persen, 100)}%`,
+                                }}
                               />
                             </div>
                             <span className="progress-pct">{j.persen}%</span>
                           </div>
-                          <div style={{ fontSize: "0.72rem", color: "#9CA3AF", marginTop: "3px" }}>
+                          <div className="progress-meta">
                             {j.diterima} / {j.kuota} kuota
                           </div>
                         </td>
                         <td>
                           <span className="status-aktif">
-                            <span className="dot-aktif" />
+                            <span className="dot-aktif" aria-hidden="true" />
                             Aktif
                           </span>
                         </td>
@@ -399,25 +670,32 @@ export default function LaporanPage() {
               </table>
             </div>
 
-            {/* Bottom: Chart + Info */}
             <div className="bottom-row">
-              {/* Bar chart */}
-              <div className="panel">
+              <div className="panel" data-animate data-delay="200">
                 <div className="chart-header">
                   <div className="panel-title">Tren Pendaftaran Harian</div>
                   <span className="chart-badge">7 Hari Terakhir</span>
                 </div>
                 <div className="chart-wrap">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={trend} barSize={28}>
-                      <CartesianGrid vertical={false} stroke="#F3F4F6" />
+                    <BarChart data={trend} barSize={32}>
+                      <CartesianGrid
+                        vertical={false}
+                        stroke="#E5E7EB"
+                        strokeDasharray="0"
+                      />
                       <XAxis
                         dataKey="hari"
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fontSize: 11, fill: "#6B7280" }}
+                        tick={{ fontSize: 12, fill: "#6B7280" }}
                       />
-                      <YAxis hide />
+                      <YAxis
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fontSize: 12, fill: "#6B7280" }}
+                        width={32}
+                      />
                       <Tooltip
                         cursor={{ fill: "#F2F8F4" }}
                         contentStyle={{
@@ -427,11 +705,21 @@ export default function LaporanPage() {
                         }}
                         formatter={(v: unknown) => [`${v} pendaftar`, ""]}
                       />
-                      <Bar dataKey="jumlah" radius={[4, 4, 0, 0]}>
+                      <Bar
+                        dataKey="jumlah"
+                        radius={[6, 6, 0, 0]}
+                        isAnimationActive={true}
+                        animationDuration={800}
+                        animationEasing="ease-out"
+                      >
                         {trend.map((entry, index) => (
                           <Cell
                             key={index}
-                            fill={entry.jumlah === maxTrend ? "#1C5C38" : "#D1FAE5"}
+                            fill={
+                              entry.jumlah === maxTrend && maxTrend > 0
+                                ? "#1C5C38"
+                                : "#D1FAE5"
+                            }
                           />
                         ))}
                       </Bar>
@@ -440,23 +728,27 @@ export default function LaporanPage() {
                 </div>
               </div>
 
-              {/* Info card */}
-              <div className="info-card">
+              <div className="info-card" data-animate data-delay="250">
+                <div className="info-card-deco" aria-hidden="true" />
                 <div>
                   <div className="info-card-title">Informasi Penting</div>
-                  {sisaHari() !== null && (
+                  {sisa !== null && (
                     <>
-                      <div className="info-card-days">{sisaHari()}</div>
-                      <div className="info-card-days-label">hari lagi tutup pendaftaran</div>
+                      <div className="info-card-days">{sisa}</div>
+                      <div className="info-card-days-label">
+                        hari lagi tutup pendaftaran
+                      </div>
                     </>
                   )}
                   <div className="info-card-body">
-                    {sisaHari() === 0
+                    {sisa === 0
                       ? "Pendaftaran sudah ditutup. Lanjutkan proses verifikasi berkas."
-                      : `Penutupan pendaftaran tersisa ${sisaHari()} hari lagi. Pastikan semua verifikasi data selesai sebelum tanggal penutupan.`}
+                      : `Penutupan pendaftaran tersisa ${sisa ?? "—"} hari lagi. Pastikan semua verifikasi data selesai sebelum tanggal penutupan.`}
                   </div>
                 </div>
-                <a href="#" className="btn-jadwal">Lihat Jadwal →</a>
+                <a href="#" className="btn-jadwal no-print">
+                  Lihat Jadwal →
+                </a>
               </div>
             </div>
           </>
