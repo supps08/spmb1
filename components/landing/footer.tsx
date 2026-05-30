@@ -1,8 +1,8 @@
 import Link from "next/link";
 import {
   Globe,
-  Instagram,
-  Youtube,
+  Share2,
+  PlayCircle,
   Mail,
   Phone,
   MapPin,
@@ -203,10 +203,10 @@ export default function LandingFooter() {
                   <Globe size={20} />
                 </a>
                 <a href="#" aria-label="Instagram">
-                  <Instagram size={20} />
+                  <Share2 size={20} />
                 </a>
                 <a href="#" aria-label="YouTube">
-                  <Youtube size={20} />
+                  <PlayCircle size={20} />
                 </a>
               </div>
             </div>
