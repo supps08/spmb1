@@ -13,10 +13,49 @@
 //          - Footer
 // ============================================================
 
+"use client";
+
 import Link from "next/link";
+import { useEffect } from "react";
 import LandingFooter from "@/components/landing/footer";
 
 export default function LandingPage() {
+
+  useEffect(() => {
+    const navbar = document.getElementById("lp-navbar");
+    const handleScroll = () => {
+      if (navbar) navbar.classList.toggle("scrolled", window.scrollY > 20);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    const reveals = document.querySelectorAll(".reveal");
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("visible");
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.12 });
+    reveals.forEach((el) => observer.observe(el));
+
+    const links = document.querySelectorAll('a[href^="#"]');
+    const handleClick = (e: Event) => {
+      const a = e.currentTarget as HTMLAnchorElement;
+      const href = a.getAttribute("href");
+      if (!href || href === "#") return;
+      const target = document.querySelector(href);
+      if (target) { e.preventDefault(); target.scrollIntoView({ behavior: "smooth" }); }
+    };
+    links.forEach((a) => a.addEventListener("click", handleClick));
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      observer.disconnect();
+      links.forEach((a) => a.removeEventListener("click", handleClick));
+    };
+  }, []);
+
   return (
     <>
       <style>{`
@@ -578,28 +617,49 @@ export default function LandingPage() {
 
           <div>
             {[
-              {
-                kode: "TKJ",
-                nama: "Teknik Komputer & Jaringan",
-                desc: "Kuasai infrastruktur jaringan, keamanan siber, dan administrasi sistem. Siap kerja di bidang IT support dan network engineering.",
-                img: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&h=340&fit=crop&q=80",
-                delay: "",
-              },
-              {
-                kode: "PPLG",
-                nama: "Pengembangan Perangkat Lunak & GIM",
-                desc: "Belajar full-stack development, mobile app, dan game development. Stack modern: React, Flutter, dan Unity.",
-                img: "https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=600&h=340&fit=crop&q=80",
-                delay: "reveal-delay-1",
-              },
-              {
-                kode: "MPLB",
-                nama: "Manajemen Perkantoran & Layanan Bisnis",
-                desc: "Administrasi profesional, manajemen dokumen digital, dan layanan pelanggan standar industri.",
-                img: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&h=340&fit=crop&q=80",
-                delay: "reveal-delay-2",
-              },
-            ].map((j) => (
+  {
+    kode: "TKJ",
+    nama: "Teknik Komputer & Jaringan",
+    desc: "Kuasai infrastruktur jaringan, keamanan siber, dan administrasi sistem. Siap kerja di bidang IT support dan network engineering.",
+    img: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&h=340&fit=crop&q=80",
+    delay: "",
+  },
+  {
+    kode: "PPLG",
+    nama: "Pengembangan Perangkat Lunak & GIM",
+    desc: "Belajar full-stack development, mobile app, dan game development. Stack modern: React, Flutter, dan Unity.",
+    img: "https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=600&h=340&fit=crop&q=80",
+    delay: "reveal-delay-1",
+  },
+  {
+    kode: "MPLB",
+    nama: "Manajemen Perkantoran & Layanan Bisnis",
+    desc: "Administrasi profesional, manajemen dokumen digital, dan layanan pelanggan standar industri.",
+    img: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&h=340&fit=crop&q=80",
+    delay: "reveal-delay-2",
+  },
+  {
+    kode: "DKV",
+    nama: "Desain Komunikasi Visual",
+    desc: "Kuasai desain grafis, ilustrasi digital, dan branding. Siap berkarier di industri kreatif, periklanan, dan media digital.",
+    img: "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=600&h=340&fit=crop&q=80",
+    delay: "",
+  },
+  {
+    kode: "TJKT",
+    nama: "Teknik Jaringan Komputer & Telekomunikasi",
+    desc: "Pelajari instalasi jaringan, fiber optik, dan sistem telekomunikasi modern. Peluang karier di provider internet dan infrastruktur digital.",
+    img: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=600&h=340&fit=crop&q=80",
+    delay: "reveal-delay-1",
+  },
+  {
+    kode: "PHT",
+    nama: "Perhotelan",
+    desc: "Pelajari manajemen hospitality, pelayanan tamu profesional, dan operasional hotel standar internasional.",
+    img: "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600&h=340&fit=crop&q=80",
+    delay: "reveal-delay-2",
+  },
+].map((j) => (
               <div className={`jurusan-item reveal ${j.delay}`} key={j.kode}>
                 <div className="jurusan-img-wrap">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
