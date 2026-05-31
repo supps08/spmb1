@@ -15,6 +15,7 @@
 
 import Link from "next/link";
 import LandingFooter from "@/components/landing/footer";
+import StatsBlock from "@/components/landing/stats-block";
 
 export default function LandingPage() {
   return (
@@ -132,11 +133,14 @@ export default function LandingPage() {
         nav {
           position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
           backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-          background: rgba(255,255,255,0.88);
-          border-bottom: 1px solid var(--border);
-          transition: box-shadow 0.3s ease;
+          background: rgba(255,255,255,0.05);
+          border-bottom: 1px solid rgba(255,255,255,0.1);
+          transition: background 0.3s ease, border-color 0.3s ease;
         }
-        nav.scrolled { box-shadow: 0 4px 24px rgba(0,0,0,0.06); }
+        nav.scrolled {
+          background: rgba(240,248,244,0.92);
+          border-bottom: 1px solid rgba(196,224,209,0.6);
+        }
         .nav-inner {
           display: flex; align-items: center;
           justify-content: space-between; height: 68px; gap: 32px;
@@ -312,13 +316,126 @@ export default function LandingPage() {
         .stats { background: var(--ink-2,#1A1A1A); padding: 120px 0; }
         .stats-label { color: rgba(255,255,255,0.5); }
         .stats-label::before { background: var(--accent); }
-        .stats h2 { font-size:clamp(2rem,3.5vw,3rem);color:white;font-weight:800;margin-bottom:80px;max-width:500px; }
-        .stats-grid { display:grid;grid-template-columns:repeat(4,1fr);gap:0; }
-        .stat-item { padding:40px;border-right:1px solid var(--border-dark); }
-        .stat-item:last-child { border-right: none; }
+        .stats-layout {
+          display: grid; grid-template-columns: 1fr 1fr;
+          gap: 60px; align-items: start;
+        }
+        .stats-heading {
+          font-size: clamp(2rem,3.5vw,3rem);
+          color: white; font-weight: 800;
+          margin-bottom: 32px; max-width: 500px;
+        }
+        .stats-carousel { margin-top: 8px; }
+        .stats-carousel-frame {
+          position: relative; width: 100%;
+          aspect-ratio: 16 / 9; border-radius: 12px;
+          overflow: hidden; margin-bottom: 16px;
+        }
+        .stats-carousel-img {
+          width: 100%; height: 100%; object-fit: cover;
+          border-radius: 12px;
+          animation: statsImgFade 0.3s ease;
+        }
+        @keyframes statsImgFade {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        .stats-carousel-nav { display: flex; gap: 12px; }
+        .stats-carousel-btn {
+          width: 40px; height: 40px;
+          border: 1px solid rgba(255,255,255,0.2);
+          border-radius: 50%; background: transparent;
+          color: white; font-size: 1rem; cursor: pointer;
+          display: flex; align-items: center; justify-content: center;
+          transition: border-color 0.2s ease, background 0.2s ease;
+        }
+        .stats-carousel-btn:hover {
+          border-color: white;
+          background: rgba(255,255,255,0.1);
+        }
+        .stats-cards-grid {
+          display: grid; grid-template-columns: 1fr 1fr;
+          gap: 1px; background: var(--border-dark);
+        }
+        .stat-card {
+          padding: 40px; background: var(--ink-2,#1A1A1A);
+          border: 1px solid transparent;
+          text-align: left; position: relative;
+          transition: all 0.2s ease;
+        }
+        .stat-card-clickable {
+          cursor: pointer;
+        }
+        .stat-card-clickable:hover {
+          border-color: rgba(28,92,56,0.5);
+          transform: translateY(-2px);
+        }
+        .stat-card-static { cursor: default; }
+        .stat-card-icon {
+          position: absolute; top: 16px; right: 16px;
+          font-size: 0.75rem; color: rgba(255,255,255,0.35);
+        }
         .stat-num { font-family:'Bricolage Grotesque',sans-serif;font-size:clamp(2.8rem,5vw,4rem);font-weight:800;color:white;line-height:1;margin-bottom:12px; }
         .stat-num span { color: var(--accent); }
         .stat-lbl { font-size:0.85rem;color:rgba(255,255,255,0.45);font-weight:500;text-transform:uppercase;letter-spacing:0.06em; }
+        .stat-sublbl {
+          font-size: 0.72rem; color: rgba(255,255,255,0.3);
+          margin-top: 6px; text-transform: none; letter-spacing: 0;
+          font-weight: 400;
+        }
+        .stats-modal-overlay {
+          position: fixed; inset: 0; z-index: 100;
+          background: rgba(0,0,0,0.7);
+          backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+        }
+        .stats-modal-card {
+          position: fixed; top: 50%; left: 50%;
+          transform: translate(-50%, -50%);
+          background: #1a1a1a;
+          border: 1px solid rgba(255,255,255,0.1);
+          border-radius: 16px; padding: 32px;
+          max-width: 480px; width: calc(100% - 40px);
+          animation: fadeUp 0.3s ease;
+        }
+        .stats-modal-close {
+          position: absolute; top: 16px; right: 16px;
+          background: none; border: none;
+          color: rgba(255,255,255,0.5);
+          font-size: 1.5rem; line-height: 1;
+          cursor: pointer; padding: 4px;
+          transition: color 0.2s ease;
+        }
+        .stats-modal-close:hover { color: white; }
+        .stats-modal-text {
+          color: rgba(255,255,255,0.75);
+          font-size: 0.92rem; line-height: 1.7;
+          padding-right: 24px;
+        }
+        .stats-modal-table {
+          width: 100%; border-collapse: collapse;
+          margin-bottom: 16px;
+        }
+        .stats-modal-table td {
+          padding: 10px 0;
+          border-bottom: 1px solid rgba(255,255,255,0.08);
+          color: rgba(255,255,255,0.85);
+          font-size: 0.9rem;
+        }
+        .stats-modal-table td:last-child {
+          text-align: right; color: var(--accent); font-weight: 600;
+        }
+        .stats-modal-note {
+          font-size: 0.78rem; color: rgba(255,255,255,0.4);
+        }
+        .stats-modal-mitra-grid {
+          list-style: none;
+          display: grid; grid-template-columns: 1fr 1fr;
+          gap: 12px 20px;
+          padding-right: 24px;
+        }
+        .stats-modal-mitra-grid li {
+          font-size: 0.88rem; color: rgba(255,255,255,0.8);
+        }
 
         /* ===== MARQUEE 2 ===== */
         .marquee-section-2 { background:var(--bg-soft);padding:22px 0;overflow:hidden; }
@@ -365,6 +482,23 @@ export default function LandingPage() {
           transition:all 0.25s ease;
         }
         .btn-white:hover { transform:translateY(-2px);box-shadow:0 8px 24px rgba(255,255,255,0.2); }
+        .btn-cta-primary {
+          display:inline-flex;align-items:center;gap:8px;
+          background:#1C5C38;color:#fff;border:none;border-radius:var(--radius-pill);
+          padding:14px 28px;font-family:'Plus Jakarta Sans',sans-serif;
+          font-weight:700;font-size:0.9rem;cursor:pointer;text-decoration:none;
+          transition:all 0.25s ease;
+        }
+        .btn-cta-primary:hover { transform:translateY(-2px);box-shadow:0 8px 24px rgba(28,92,56,0.35); }
+        .btn-cta-outline {
+          display:inline-flex;align-items:center;gap:8px;
+          background:transparent;color:#fff;
+          border:1.5px solid #1C5C38;border-radius:var(--radius-pill);
+          padding:14px 28px;font-family:'Plus Jakarta Sans',sans-serif;
+          font-weight:600;font-size:0.9rem;cursor:pointer;text-decoration:none;
+          transition:all 0.25s ease;
+        }
+        .btn-cta-outline:hover { transform:translateY(-2px);background:rgba(28,92,56,0.15); }
         .cta-deco { position:relative;width:260px;height:280px;flex-shrink:0; }
         .cta-deco img { width:240px;height:260px;object-fit:cover;border-radius:20px;border:3px solid rgba(255,255,255,0.1); }
         .cta-deco-badge {
@@ -386,15 +520,15 @@ export default function LandingPage() {
           .jurusan-item { grid-template-columns: 1fr; }
           .jurusan-img { height: 220px; }
           .alur-top { flex-direction: column; align-items: flex-start; }
-          .stats-grid { grid-template-columns: repeat(2,1fr); }
-          .stat-item { border-right:none;border-bottom:1px solid var(--border-dark); }
+          .stats-layout { grid-template-columns: 1fr; gap: 48px; }
+          .stats-cards-grid { grid-template-columns: repeat(2,1fr); }
           .cta-inner { grid-template-columns: 1fr; padding: 48px; }
           .cta-deco { display: none; }
           .nav-links { display: none; }
         }
 
         @media (max-width: 600px) {
-          .stats-grid { grid-template-columns: 1fr 1fr; }
+          .stats-cards-grid { grid-template-columns: 1fr 1fr; }
           .alur-step { grid-template-columns: 60px 1px 1fr; gap: 0 20px; }
           .step-num { font-size: 2rem; }
           .hero-ctas { flex-direction: column; }
@@ -573,30 +707,51 @@ export default function LandingPage() {
         <div className="container">
           <div className="jurusan-header reveal">
             <div className="section-label">Program Studi</div>
-            <h2>3 Jurusan Unggulan<br />untuk Masa Depanmu</h2>
+            <h2>6 Jurusan Unggulan<br />untuk Masa Depanmu</h2>
           </div>
 
           <div>
             {[
               {
+                kode: "PPLG",
+                nama: "Rekayasa Perangkat Lunak",
+                desc: "Belajar pengembangan aplikasi web, mobile, dan sistem perangkat lunak dengan stack industri terkini.",
+                img: "https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=600&h=340&fit=crop&q=80",
+                delay: "",
+              },
+              {
                 kode: "TKJ",
                 nama: "Teknik Komputer & Jaringan",
                 desc: "Kuasai infrastruktur jaringan, keamanan siber, dan administrasi sistem. Siap kerja di bidang IT support dan network engineering.",
                 img: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&h=340&fit=crop&q=80",
-                delay: "",
-              },
-              {
-                kode: "PPLG",
-                nama: "Pengembangan Perangkat Lunak & GIM",
-                desc: "Belajar full-stack development, mobile app, dan game development. Stack modern: React, Flutter, dan Unity.",
-                img: "https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=600&h=340&fit=crop&q=80",
                 delay: "reveal-delay-1",
               },
               {
+                kode: "PM",
+                nama: "Pemasaran dan Marketing",
+                desc: "Pelajari strategi pemasaran digital, branding, dan komunikasi bisnis untuk dunia industri modern.",
+                img: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=600&h=340&fit=crop&q=80",
+                delay: "reveal-delay-2",
+              },
+              {
+                kode: "DKV",
+                nama: "Multimedia & Produksi Konten",
+                desc: "Kembangkan skill desain grafis, video production, dan konten kreatif untuk media digital.",
+                img: "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=600&h=340&fit=crop&q=80",
+                delay: "reveal-delay-3",
+              },
+              {
                 kode: "MPLB",
-                nama: "Manajemen Perkantoran & Layanan Bisnis",
+                nama: "Manajemen & Layanan Bisnis",
                 desc: "Administrasi profesional, manajemen dokumen digital, dan layanan pelanggan standar industri.",
                 img: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&h=340&fit=crop&q=80",
+                delay: "reveal-delay-1",
+              },
+              {
+                kode: "PH",
+                nama: "Perhotelan & Pariwisata",
+                desc: "Siap berkarier di industri hospitality dengan pelatihan layanan hotel, front office, dan pariwisata.",
+                img: "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600&h=340&fit=crop&q=80",
                 delay: "reveal-delay-2",
               },
             ].map((j) => (
@@ -634,26 +789,26 @@ export default function LandingPage() {
             {[
               {
                 num: "01",
-                title: "Buat Akun & Isi Data Diri",
-                desc: "Daftar dengan email aktif, isi data diri lengkap termasuk NIK dan NISN. Sistem akan verifikasi data kamu secara otomatis.",
+                title: "Registrasi Online",
+                desc: "Buat akun di portal kami dengan mudah tanpa biaya administrasi",
                 delay: "",
               },
               {
                 num: "02",
-                title: "Pilih Jurusan & Upload Dokumen",
-                desc: "Pilih jurusan impianmu dan upload dokumen yang diperlukan: foto, ijazah/SKL, rapor, dan KK. Semua bisa dilakukan dari HP.",
+                title: "Tes Bakat & Minat",
+                desc: "Ikuti asesmen kognitif dan praktis untuk menentukan jurusan terbaik",
                 delay: "reveal-delay-1",
               },
               {
                 num: "03",
-                title: "Verifikasi & Seleksi Berkas",
-                desc: "Tim kami memverifikasi berkas dalam 1–3 hari kerja. Kamu bisa pantau status pendaftaran secara real-time di dashboard.",
+                title: "Wawancara Industri",
+                desc: "Sesi wawancara bersama praktisi industri untuk mengevaluasi motivasi",
                 delay: "reveal-delay-2",
               },
               {
                 num: "04",
                 title: "Pengumuman & Daftar Ulang",
-                desc: "Hasil seleksi diumumkan secara online. Jika diterima, lakukan daftar ulang dan lengkapi administrasi untuk memulai tahun ajaran baru.",
+                desc: "Calon siswa diterima akan mendapatkan notifikasi resmi",
                 delay: "reveal-delay-3",
               },
             ].map((s) => (
@@ -673,23 +828,7 @@ export default function LandingPage() {
       {/* ===== STATISTIK ===== */}
       <section className="stats" id="tentang">
         <div className="container">
-          <div className="section-label stats-label reveal">Siapa Kami</div>
-          <h2 className="reveal">Angka yang Berbicara<br />untuk Diri Kami</h2>
-          <div className="stats-grid">
-            {[
-              { num: "20", suffix: "+", label: "Tahun Berdiri" },
-              { num: "1.5k", suffix: "+", label: "Alumni Sukses" },
-              { num: "98", suffix: "%", label: "Keterserapan Kerja" },
-              { num: "45", suffix: "+", label: "Mitra Industri" },
-            ].map((s, i) => (
-              <div className={`stat-item reveal${i > 0 ? ` reveal-delay-${i}` : ""}`} key={s.label}>
-                <div className="stat-num">
-                  {s.num}<span>{s.suffix}</span>
-                </div>
-                <div className="stat-lbl">{s.label}</div>
-              </div>
-            ))}
-          </div>
+          <StatsBlock />
         </div>
       </section>
 
@@ -783,15 +922,20 @@ export default function LandingPage() {
           <div className="cta-inner">
             <div className="reveal">
               <div className="section-label cta-label">Siap Mulai?</div>
-              <h2>Mulai Langkah Pertamamu Hari Ini</h2>
+              <h2>Siap Jadi Bagian Dari Masa Depan Digital?</h2>
               <p>
                 Jangan tunda lagi. Kuota terbatas setiap tahunnya. Daftar sekarang
                 dan jadilah bagian dari generasi digital yang siap kerja.
               </p>
               <div className="cta-buttons">
-                <Link href="/register" className="btn-white">Daftar Sekarang →</Link>
-                <a href="mailto:hello@smkdigital.sch.id" className="btn-outline-white">
-                  Hubungi Kami
+                <Link href="/register" className="btn-cta-primary">Daftar Sekarang Juga</Link>
+                <a
+                  href="https://wa.me/6221772010"
+                  className="btn-cta-outline"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Hubungi Tim Admission
                 </a>
               </div>
             </div>
@@ -815,7 +959,7 @@ export default function LandingPage() {
         const navbar = document.getElementById('lp-navbar');
         if (navbar) {
           window.addEventListener('scroll', () => {
-            navbar.classList.toggle('scrolled', window.scrollY > 20);
+            navbar.classList.toggle('scrolled', window.scrollY > 60);
           });
         }
 
