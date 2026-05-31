@@ -231,6 +231,16 @@ export default function PendaftaranPage() {
     load();
   }, [supabase, router, showToast]);
 
+  // Cleanup semua object URLs saat component unmount
+  useEffect(() => {
+    return () => {
+      Object.values(berkasPreviews).forEach((url) => {
+        if (url) URL.revokeObjectURL(url);
+      });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally empty — hanya cleanup saat unmount
+
   function validateStep(current: number): string[] {
     const errs: string[] = [];
     if (current === 1) {
@@ -251,16 +261,11 @@ export default function PendaftaranPage() {
       if (!form.asal_sekolah.trim()) errs.push("Asal sekolah wajib diisi.");
       if (!form.jurusan_id) errs.push("Pilihan jurusan wajib dipilih.");
     }
-    if (current === 2) {
-      if (!form.nisn.trim() || form.nisn.replace(/\D/g, "").length !== 10) {
-        errs.push("NISN wajib 10 digit angka.");
-      }
-      if (!form.nik.trim() || form.nik.replace(/\D/g, "").length !== 16) {
-        errs.push("NIK wajib 16 digit angka.");
-      }
-      if (!form.asal_sekolah.trim()) errs.push("Asal sekolah wajib diisi.");
-      if (!form.jurusan_id) errs.push("Pilihan jurusan wajib dipilih.");
-    }
+    // Step 2 hanya konfirmasi — field sudah divalidasi di Step 1
+// Cukup cek kalau ada yang terhapus secara tidak sengaja
+if (current === 2) {
+  if (!form.jurusan_id) errs.push("Pilihan jurusan wajib dipilih.");
+}
     if (current === 3) {
       if (!form.nama_ayah.trim()) errs.push("Nama ayah wajib diisi.");
       if (!form.nama_ibu.trim()) errs.push("Nama ibu wajib diisi.");
@@ -435,6 +440,8 @@ export default function PendaftaranPage() {
   }
 
   async function handleSubmit() {
+    if (submitting) return; // hard guard
+    
     const errs = validateStep(4);
     if (errs.length > 0) {
       setErrors(errs);
@@ -444,7 +451,7 @@ export default function PendaftaranPage() {
     setErrors([]);
     setSubmitting(true);
     try {
-      await persistStep(4);
+      // Tidak perlu persistStep(4) lagi — sudah disimpan waktu user klik Lanjut di Step 4
       const { error } = await supabase
         .from("siswa")
         .update({

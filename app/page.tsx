@@ -869,41 +869,6 @@ export default function LandingPage() {
 
       <LandingFooter />
 
-      {/* ===== CLIENT SCRIPTS ===== */}
-      <script dangerouslySetInnerHTML={{ __html: `
-        // Navbar scroll effect
-        const navbar = document.getElementById('lp-navbar');
-        if (navbar) {
-          window.addEventListener('scroll', () => {
-            navbar.classList.toggle('scrolled', window.scrollY > 20);
-          });
-        }
-
-        // Scroll reveal
-        const reveals = document.querySelectorAll('.reveal');
-        const revealObserver = new IntersectionObserver((entries) => {
-          entries.forEach(entry => {
-            if (entry.isIntersecting) {
-              entry.target.classList.add('visible');
-              revealObserver.unobserve(entry.target);
-            }
-          });
-        }, { threshold: 0.12 });
-        reveals.forEach(el => revealObserver.observe(el));
-
-        // Smooth scroll
-        document.querySelectorAll('a[href^="#"]').forEach(a => {
-          a.addEventListener('click', e => {
-            const href = a.getAttribute('href');
-            if (href === '#') return;
-            const target = document.querySelector(href);
-            if (target) {
-              e.preventDefault();
-              target.scrollIntoView({ behavior: 'smooth' });
-            }
-          });
-        });
-      ` }} />
     </>
   );
 }
