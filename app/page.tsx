@@ -17,6 +17,12 @@ import Link from "next/link";
 import LandingFooter from "@/components/landing/footer";
 import StatsBlock from "@/components/landing/stats-block";
 
+export const metadata = {
+  title: "SPMB SMK Citra Negara — Pendaftaran Online",
+  description:
+    "Daftar sekarang di SMK Citra Negara Depok. Sistem Penerimaan Murid Baru online yang cepat dan mudah.",
+};
+
 export default function LandingPage() {
   return (
     <>
@@ -930,7 +936,7 @@ export default function LandingPage() {
               <div className="cta-buttons">
                 <Link href="/register" className="btn-cta-primary">Daftar Sekarang Juga</Link>
                 <a
-                  href="https://wa.me/6221772010"
+                  href="https://wa.me/622177201052"
                   className="btn-cta-outline"
                   target="_blank"
                   rel="noopener noreferrer"

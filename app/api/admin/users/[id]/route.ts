@@ -52,7 +52,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
   const { data: profile, error: dbError } = await supabase
     .from("profiles")
-    .select("id, full_name, email, role, created_at")
+    .select("id, full_name, email, role, is_active, created_at")
     .eq("id", id)
     .single();
 
@@ -60,12 +60,13 @@ export async function GET(_req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "User tidak ditemukan." }, { status: 404 });
   }
 
-  const user: PublicUser = {
+  const user = {
     id: profile.id,
     name: profile.full_name,
     email: profile.email,
     role: profile.role as "admin" | "user",
     createdAt: profile.created_at,
+    is_active: profile.is_active ?? true,
   };
 
   return NextResponse.json({ user });
@@ -84,11 +85,12 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   const { id } = await params;
   const body = await req.json();
-  const { name, email, role, password } = body as {
+  const { name, email, role, password, is_active } = body as {
     name?: string;
     email?: string;
     role?: string;
     password?: string;
+    is_active?: boolean;
   };
 
   // Admin tidak bisa turunkan role diri sendiri
@@ -110,11 +112,12 @@ export async function PUT(req: NextRequest, { params }: Params) {
     );
   }
 
-  // Update kolom profiles (name, email, role)
-  const updates: Record<string, string> = {};
+  // Update kolom profiles (name, email, role, is_active)
+  const updates: Record<string, string | boolean> = {};
   if (name) updates.full_name = name.trim();
   if (email) updates.email = email.trim().toLowerCase();
   if (role) updates.role = role;
+  if (typeof is_active === "boolean") updates.is_active = is_active;
 
   if (Object.keys(updates).length > 0) {
     const { error: profileError } = await supabase
@@ -162,7 +165,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
   // Ambil data terbaru
   const { data: updated } = await supabase
     .from("profiles")
-    .select("id, full_name, email, role, created_at")
+    .select("id, full_name, email, role, is_active, created_at")
     .eq("id", id)
     .single();
 
@@ -170,12 +173,13 @@ export async function PUT(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "User tidak ditemukan." }, { status: 404 });
   }
 
-  const user: PublicUser = {
+  const user = {
     id: updated.id,
     name: updated.full_name,
     email: updated.email,
     role: updated.role as "admin" | "user",
     createdAt: updated.created_at,
+    is_active: updated.is_active ?? true,
   };
 
   return NextResponse.json({ user });

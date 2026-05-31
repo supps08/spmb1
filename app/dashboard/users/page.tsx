@@ -168,6 +168,7 @@ export default function UsersPage() {
       name: form.name,
       email: form.email,
       role: form.role,
+      is_active: form.is_active,
     };
     if (form.password) body.password = form.password;
 
@@ -185,6 +186,27 @@ export default function UsersPage() {
     setModalOpen(false);
     await fetchUsers();
     showToast(`Akun ${data.user.name} berhasil diperbarui!`, "success");
+  }
+
+  async function handleToggleActive(newValue: boolean) {
+    if (!editTarget) return;
+    setForm((p) => ({ ...p, is_active: newValue }));
+    const res = await fetch(`/api/admin/users/${editTarget.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ is_active: newValue }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setForm((p) => ({ ...p, is_active: !newValue }));
+      showToast(data.error || "Gagal mengubah status akun.", "error");
+      return;
+    }
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.id === editTarget.id ? { ...u, is_active: newValue } : u
+      )
+    );
   }
 
   async function handleDelete(user: User) {
@@ -1232,9 +1254,7 @@ export default function UsersPage() {
                 <button
                   type="button"
                   className={`toggle-switch${form.is_active ? " on" : " off"}`}
-                  onClick={() =>
-                    setForm((p) => ({ ...p, is_active: !p.is_active }))
-                  }
+                  onClick={() => handleToggleActive(!form.is_active)}
                   aria-pressed={form.is_active}
                   aria-label="Toggle status aktif"
                 >
