@@ -16,6 +16,7 @@
 import Link from "next/link";
 import LandingFooter from "@/components/landing/footer";
 import StatsBlock from "@/components/landing/stats-block";
+import HeroCountdown from "@/components/landing/hero-countdown";
 
 export const metadata = {
   title: "SPMB SMK Citra Negara — Pendaftaran Online",
@@ -576,6 +577,7 @@ export default function LandingPage() {
                 <Link href="/register" className="btn-primary">Daftar PPDB →</Link>
                 <a href="#alur" className="btn-outline">Lihat Alur</a>
               </div>
+              <HeroCountdown />
             </div>
 
             <div className="hero-right">
