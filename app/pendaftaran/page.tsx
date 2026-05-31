@@ -13,7 +13,6 @@ import {
   Check,
   ArrowRight,
   ArrowLeft,
-  Upload,
   FileText,
   X,
 } from "lucide-react";
@@ -49,6 +48,8 @@ interface FormData {
   nik: string;
   asal_sekolah: string;
   jurusan_id: string;
+  nilai_rata_rata: string;
+  prestasi: string;
   nama_ayah: string;
   nama_ibu: string;
   no_ortu: string;
@@ -69,6 +70,8 @@ const EMPTY_FORM: FormData = {
   nik: "",
   asal_sekolah: "",
   jurusan_id: "",
+  nilai_rata_rata: "",
+  prestasi: "",
   nama_ayah: "",
   nama_ibu: "",
   no_ortu: "",
@@ -79,11 +82,43 @@ const EMPTY_FORM: FormData = {
 type BerkasKey = "foto" | "ijazah" | "rapor" | "kk";
 
 const BERKAS_LABELS: Record<BerkasKey, string> = {
-  foto: "Foto 3×4",
+  foto: "Foto Formal 3x4",
   ijazah: "Ijazah / SKL",
-  rapor: "Rapor",
+  rapor: "Rapor Semester Terakhir",
   kk: "Kartu Keluarga",
 };
+
+const BERKAS_ACCEPT: Record<BerkasKey, string> = {
+  foto: ".jpg,.jpeg,.png,image/jpeg,image/png",
+  ijazah: ".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png",
+  rapor: ".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png",
+  kk: ".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png",
+};
+
+const MAX_BERKAS_BYTES = 2 * 1024 * 1024;
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function isAllowedBerkasType(key: BerkasKey, file: File) {
+  const mime = file.type.toLowerCase();
+  const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+  if (key === "foto") {
+    return mime === "image/jpeg" || mime === "image/png" || ext === "jpg" || ext === "jpeg" || ext === "png";
+  }
+  return (
+    mime === "application/pdf" ||
+    mime === "image/jpeg" ||
+    mime === "image/png" ||
+    ext === "pdf" ||
+    ext === "jpg" ||
+    ext === "jpeg" ||
+    ext === "png"
+  );
+}
 
 export default function PendaftaranPage() {
   useScrollAnimation();
@@ -105,6 +140,9 @@ export default function PendaftaranPage() {
   });
   const [berkasFiles, setBerkasFiles] = useState<Partial<Record<BerkasKey, File>>>({});
   const [berkasPreviews, setBerkasPreviews] = useState<Partial<Record<BerkasKey, string>>>({});
+  const [berkasMeta, setBerkasMeta] = useState<
+    Partial<Record<BerkasKey, { name: string; size: number }>>
+  >({});
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -182,6 +220,9 @@ export default function PendaftaranPage() {
         nik: siswa.nik ?? "",
         asal_sekolah: siswa.asal_sekolah ?? "",
         jurusan_id: siswa.jurusan_id ?? "",
+        nilai_rata_rata:
+          siswa.nilai_rata_rata != null ? String(siswa.nilai_rata_rata) : "",
+        prestasi: siswa.prestasi ?? "",
         nama_ayah: "",
         nama_ibu: "",
         no_ortu: "",
@@ -252,19 +293,22 @@ export default function PendaftaranPage() {
       if (!form.jurusan_id) errs.push("Pilihan jurusan wajib dipilih.");
     }
     if (current === 2) {
-      if (!form.nisn.trim() || form.nisn.replace(/\D/g, "").length !== 10) {
-        errs.push("NISN wajib 10 digit angka.");
+      const nilai = form.nilai_rata_rata.trim();
+      if (!nilai) {
+        errs.push("Nilai rata-rata rapor wajib diisi.");
+      } else {
+        const n = Number(nilai);
+        if (Number.isNaN(n) || n < 0 || n > 100) {
+          errs.push("Nilai rata-rata rapor harus antara 0 dan 100.");
+        }
       }
-      if (!form.nik.trim() || form.nik.replace(/\D/g, "").length !== 16) {
-        errs.push("NIK wajib 16 digit angka.");
-      }
-      if (!form.asal_sekolah.trim()) errs.push("Asal sekolah wajib diisi.");
-      if (!form.jurusan_id) errs.push("Pilihan jurusan wajib dipilih.");
     }
     if (current === 3) {
       if (!form.nama_ayah.trim()) errs.push("Nama ayah wajib diisi.");
       if (!form.nama_ibu.trim()) errs.push("Nama ibu wajib diisi.");
-      if (!form.no_ortu.trim()) errs.push("Nomor HP orang tua wajib diisi.");
+      if (!form.pekerjaan_ayah.trim()) errs.push("Pekerjaan ayah wajib diisi.");
+      if (!form.pekerjaan_ibu.trim()) errs.push("Pekerjaan ibu wajib diisi.");
+      if (!form.no_ortu.trim()) errs.push("Nomor WhatsApp orang tua wajib diisi.");
     }
     if (current === 4) {
       (["foto", "ijazah", "rapor", "kk"] as BerkasKey[]).forEach((key) => {
@@ -278,8 +322,8 @@ export default function PendaftaranPage() {
 
   async function uploadBerkasFile(key: BerkasKey, file: File) {
     if (!userId || !siswaId) return null;
-    const ext = file.name.split(".").pop()?.toLowerCase() || "pdf";
-    const path = `${userId}/${key}/berkas.${ext}`;
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const path = `${userId}/${key}/${safeName}`;
     const { error: upErr } = await supabase.storage
       .from("berkas-pendaftaran")
       .upload(path, file, { upsert: true, contentType: file.type });
@@ -324,10 +368,8 @@ export default function PendaftaranPage() {
       const { error } = await supabase
         .from("siswa")
         .update({
-          nisn: form.nisn.replace(/\D/g, ""),
-          nik: form.nik.replace(/\D/g, ""),
-          asal_sekolah: form.asal_sekolah.trim(),
-          jurusan_id: form.jurusan_id || null,
+          nilai_rata_rata: Number(form.nilai_rata_rata.trim()),
+          prestasi: form.prestasi.trim() || null,
           tahap_terakhir: 3,
         })
         .eq("id", siswaId);
@@ -340,8 +382,8 @@ export default function PendaftaranPage() {
         nama_ayah: form.nama_ayah.trim(),
         nama_ibu: form.nama_ibu.trim(),
         no_ortu: form.no_ortu.trim(),
-        pekerjaan_ayah: form.pekerjaan_ayah.trim() || null,
-        pekerjaan_ibu: form.pekerjaan_ibu.trim() || null,
+        pekerjaan_ayah: form.pekerjaan_ayah.trim(),
+        pekerjaan_ibu: form.pekerjaan_ibu.trim(),
       };
       const { data: existing } = await supabase
         .from("ortu")
@@ -402,6 +444,14 @@ export default function PendaftaranPage() {
       }
 
       setBerkasFiles({});
+      setBerkasMeta((prev) => {
+        const next = { ...prev };
+        for (const key of ["foto", "ijazah", "rapor", "kk"] as BerkasKey[]) {
+          const file = berkasFiles[key];
+          if (file) next[key] = { name: file.name, size: file.size };
+        }
+        return next;
+      });
       await supabase
         .from("siswa")
         .update({ tahap_terakhir: 5 })
@@ -465,11 +515,21 @@ export default function PendaftaranPage() {
 
   function handleBerkasSelect(key: BerkasKey, file: File | null) {
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      showToast("Ukuran file maksimal 5 MB.", "error");
+    if (file.size > MAX_BERKAS_BYTES) {
+      showToast("Ukuran file maksimal 2 MB.", "error");
+      return;
+    }
+    if (!isAllowedBerkasType(key, file)) {
+      showToast(
+        key === "foto"
+          ? "Foto harus berformat JPG atau PNG."
+          : "File harus berformat PDF, JPG, atau PNG.",
+        "error"
+      );
       return;
     }
     setBerkasFiles((p) => ({ ...p, [key]: file }));
+    setBerkasMeta((p) => ({ ...p, [key]: { name: file.name, size: file.size } }));
     const preview = URL.createObjectURL(file);
     setBerkasPreviews((p) => {
       if (p[key]) URL.revokeObjectURL(p[key]!);
@@ -490,10 +550,36 @@ export default function PendaftaranPage() {
       return next;
     });
     setBerkasUrls((p) => ({ ...p, [key]: "" }));
+    setBerkasMeta((p) => {
+      const next = { ...p };
+      delete next[key];
+      return next;
+    });
+  }
+
+  function berkasDisplayName(key: BerkasKey) {
+    if (berkasFiles[key]?.name) return berkasFiles[key]!.name;
+    if (berkasMeta[key]?.name) return berkasMeta[key]!.name;
+    const url = berkasUrls[key];
+    if (!url) return null;
+    try {
+      const part = url.split("/").pop()?.split("?")[0] ?? "";
+      return decodeURIComponent(part) || "File terunggah";
+    } catch {
+      return "File terunggah";
+    }
+  }
+
+  function hasBerkas(key: BerkasKey) {
+    return !!(berkasUrls[key] || berkasFiles[key]);
   }
 
   const jurusanName =
     jurusanList.find((j) => j.id === form.jurusan_id)?.nama ?? "—";
+
+  const berkasIncomplete = (["foto", "ijazah", "rapor", "kk"] as BerkasKey[]).some(
+    (k) => !hasBerkas(k)
+  );
 
   if (loading) {
     return (
@@ -911,6 +997,163 @@ export default function PendaftaranPage() {
           color: #991B1B;
         }
 
+        .upload-zone {
+          padding: 24px;
+        }
+
+        .upload-file-row {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          text-align: left;
+        }
+
+        .upload-file-info {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .upload-file-name {
+          font-size: 13px;
+          font-weight: 600;
+          color: #0C0C0C;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .upload-file-size {
+          font-size: 11px;
+          color: #6B7280;
+          margin-top: 2px;
+        }
+
+        .upload-remove {
+          flex-shrink: 0;
+          width: 28px;
+          height: 28px;
+          border-radius: 6px;
+          border: 1px solid #E5E7EB;
+          background: #fff;
+          color: #6B7280;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+        }
+
+        .upload-remove:hover {
+          background: #FEE2E2;
+          color: #DC2626;
+          border-color: #FECACA;
+        }
+
+        .review-grid-2 {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px 32px;
+        }
+
+        .review-field dt {
+          font-size: 12px;
+          color: #6B7280;
+          font-weight: 500;
+          margin-bottom: 4px;
+        }
+
+        .review-field dd {
+          font-size: 14px;
+          color: #0C0C0C;
+          font-weight: 600;
+        }
+
+        .berkas-checklist {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .berkas-check-item {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+          font-size: 13px;
+        }
+
+        .berkas-check-icon.ok {
+          color: #16A34A;
+          flex-shrink: 0;
+          margin-top: 1px;
+        }
+
+        .berkas-check-icon.no {
+          color: #DC2626;
+          flex-shrink: 0;
+          margin-top: 1px;
+        }
+
+        .berkas-check-label {
+          font-weight: 600;
+          color: #374151;
+        }
+
+        .berkas-check-file {
+          font-size: 12px;
+          color: #6B7280;
+          margin-top: 2px;
+        }
+
+        .disclaimer-box {
+          background: #FEF3C7;
+          border: 1px solid #F59E0B;
+          border-radius: 8px;
+          padding: 14px 16px;
+          font-size: 13px;
+          color: #92400E;
+          margin: 20px 0;
+          line-height: 1.5;
+        }
+
+        .btn-submit-full {
+          width: 100%;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          padding: 14px 22px;
+          background: #1C5C38;
+          color: #fff;
+          border: none;
+          border-radius: 10px;
+          font-family: inherit;
+          font-size: 15px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background 0.15s;
+          margin-top: 8px;
+        }
+
+        .btn-submit-full:hover:not(:disabled) {
+          background: #2A7A4E;
+        }
+
+        .btn-submit-full:disabled {
+          opacity: 0.55;
+          cursor: not-allowed;
+        }
+
+        .form-actions-step5 {
+          flex-direction: column;
+          align-items: stretch;
+          gap: 16px;
+        }
+
+        .form-actions-step5 .btn-back {
+          align-self: flex-start;
+        }
+
         @media (max-width: 768px) {
           .form-grid-2,
           .form-grid-4,
@@ -923,6 +1166,9 @@ export default function PendaftaranPage() {
           }
           .form-card {
             padding: 20px 16px;
+          }
+          .review-grid-2 {
+            grid-template-columns: 1fr;
           }
         }
       `}</style>
@@ -1139,65 +1385,32 @@ export default function PendaftaranPage() {
           {step === 2 && (
             <>
               <h2 className="form-section-title">Data Akademik</h2>
-              <p style={{ fontSize: 13, color: "#6B7280", marginBottom: 16 }}>
-                Pastikan NISN dan NIK sesuai dokumen resmi sekolah.
-              </p>
-              <div className="form-grid-2">
-                <div className="form-group">
-                  <label htmlFor="nisn2">NISN (10 digit)</label>
-                  <input
-                    id="nisn2"
-                    className="form-input"
-                    value={form.nisn}
-                    onChange={(e) =>
-                      updateField("nisn", e.target.value.replace(/\D/g, "").slice(0, 10))
-                    }
-                    disabled={alreadySubmitted}
-                    inputMode="numeric"
-                  />
-                </div>
-                <div className="form-group">
-                  <label htmlFor="nik2">NIK (16 digit)</label>
-                  <input
-                    id="nik2"
-                    className="form-input"
-                    value={form.nik}
-                    onChange={(e) =>
-                      updateField("nik", e.target.value.replace(/\D/g, "").slice(0, 16))
-                    }
-                    disabled={alreadySubmitted}
-                    inputMode="numeric"
-                  />
-                </div>
+              <div className="form-group">
+                <label htmlFor="nilai_rata_rata">Nilai Rata-rata Rapor *</label>
+                <input
+                  id="nilai_rata_rata"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={0.01}
+                  className="form-input"
+                  placeholder="Contoh: 85.50"
+                  value={form.nilai_rata_rata}
+                  onChange={(e) => updateField("nilai_rata_rata", e.target.value)}
+                  disabled={alreadySubmitted}
+                />
               </div>
-              <div className="form-grid-2">
-                <div className="form-group">
-                  <label htmlFor="asal_sekolah2">Asal Sekolah</label>
-                  <input
-                    id="asal_sekolah2"
-                    className="form-input"
-                    value={form.asal_sekolah}
-                    onChange={(e) => updateField("asal_sekolah", e.target.value)}
-                    disabled={alreadySubmitted}
-                  />
-                </div>
-                <div className="form-group">
-                  <label htmlFor="jurusan_id2">Pilihan Jurusan</label>
-                  <select
-                    id="jurusan_id2"
-                    className="form-select"
-                    value={form.jurusan_id}
-                    onChange={(e) => updateField("jurusan_id", e.target.value)}
-                    disabled={alreadySubmitted}
-                  >
-                    <option value="">Pilih jurusan</option>
-                    {jurusanList.map((j) => (
-                      <option key={j.id} value={j.id}>
-                        {j.kode} — {j.nama}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div className="form-group">
+                <label htmlFor="prestasi">Prestasi / Penghargaan</label>
+                <textarea
+                  id="prestasi"
+                  className="form-textarea"
+                  rows={3}
+                  placeholder="Contoh: Juara 1 LKS 2024 (opsional)"
+                  value={form.prestasi}
+                  onChange={(e) => updateField("prestasi", e.target.value)}
+                  disabled={alreadySubmitted}
+                />
               </div>
             </>
           )}
@@ -1207,7 +1420,7 @@ export default function PendaftaranPage() {
               <h2 className="form-section-title">Data Orang Tua</h2>
               <div className="form-grid-2">
                 <div className="form-group">
-                  <label htmlFor="nama_ayah">Nama Ayah</label>
+                  <label htmlFor="nama_ayah">Nama Ayah *</label>
                   <input
                     id="nama_ayah"
                     className="form-input"
@@ -1217,7 +1430,7 @@ export default function PendaftaranPage() {
                   />
                 </div>
                 <div className="form-group">
-                  <label htmlFor="nama_ibu">Nama Ibu</label>
+                  <label htmlFor="nama_ibu">Nama Ibu *</label>
                   <input
                     id="nama_ibu"
                     className="form-input"
@@ -1229,17 +1442,7 @@ export default function PendaftaranPage() {
               </div>
               <div className="form-grid-2">
                 <div className="form-group">
-                  <label htmlFor="no_ortu">Nomor HP Orang Tua</label>
-                  <input
-                    id="no_ortu"
-                    className="form-input"
-                    value={form.no_ortu}
-                    onChange={(e) => updateField("no_ortu", e.target.value)}
-                    disabled={alreadySubmitted}
-                  />
-                </div>
-                <div className="form-group">
-                  <label htmlFor="pekerjaan_ayah">Pekerjaan Ayah</label>
+                  <label htmlFor="pekerjaan_ayah">Pekerjaan Ayah *</label>
                   <input
                     id="pekerjaan_ayah"
                     className="form-input"
@@ -1248,15 +1451,27 @@ export default function PendaftaranPage() {
                     disabled={alreadySubmitted}
                   />
                 </div>
+                <div className="form-group">
+                  <label htmlFor="pekerjaan_ibu">Pekerjaan Ibu *</label>
+                  <input
+                    id="pekerjaan_ibu"
+                    className="form-input"
+                    value={form.pekerjaan_ibu}
+                    onChange={(e) => updateField("pekerjaan_ibu", e.target.value)}
+                    disabled={alreadySubmitted}
+                  />
+                </div>
               </div>
               <div className="form-group">
-                <label htmlFor="pekerjaan_ibu">Pekerjaan Ibu</label>
+                <label htmlFor="no_ortu">Nomor WhatsApp Orang Tua *</label>
                 <input
-                  id="pekerjaan_ibu"
+                  id="no_ortu"
                   className="form-input"
-                  value={form.pekerjaan_ibu}
-                  onChange={(e) => updateField("pekerjaan_ibu", e.target.value)}
+                  placeholder="Contoh: 08123456789"
+                  value={form.no_ortu}
+                  onChange={(e) => updateField("no_ortu", e.target.value)}
                   disabled={alreadySubmitted}
+                  inputMode="tel"
                 />
               </div>
             </>
@@ -1268,15 +1483,30 @@ export default function PendaftaranPage() {
               <div className="upload-grid">
                 {(["foto", "ijazah", "rapor", "kk"] as BerkasKey[]).map((key) => {
                   const preview = berkasPreviews[key];
-                  const hasFile = !!(preview || berkasUrls[key] || berkasFiles[key]);
+                  const file = berkasFiles[key];
+                  const hasFile = hasBerkas(key);
+                  const meta = file
+                    ? { name: file.name, size: file.size }
+                    : berkasMeta[key] ??
+                      (berkasUrls[key]
+                        ? {
+                            name: berkasDisplayName(key) ?? BERKAS_LABELS[key],
+                            size: 0,
+                          }
+                        : undefined);
+                  const hint =
+                    key === "foto"
+                      ? "JPG/PNG · maks. 2 MB"
+                      : "PDF/JPG · maks. 2 MB";
                   return (
-                    <div key={key}>
+                    <div key={key} className="form-group" style={{ marginBottom: 0 }}>
+                      <label>{BERKAS_LABELS[key]} *</label>
                       <input
                         ref={(el) => {
                           fileInputRefs.current[key] = el;
                         }}
                         type="file"
-                        accept="image/*,.pdf"
+                        accept={BERKAS_ACCEPT[key]}
                         className="hidden"
                         style={{ display: "none" }}
                         onChange={(e) =>
@@ -1295,36 +1525,54 @@ export default function PendaftaranPage() {
                           setDragBerkas(null);
                           handleBerkasSelect(key, e.dataTransfer.files?.[0] ?? null);
                         }}
-                        onClick={() => fileInputRefs.current[key]?.click()}
+                        onClick={() => !hasFile && fileInputRefs.current[key]?.click()}
                       >
-                        {preview || berkasUrls[key] ? (
-                          key === "foto" && (preview || berkasUrls[key])?.match(/\.(jpg|jpeg|png|webp|gif)/i) ? (
-                            <img
-                              src={preview || berkasUrls[key]}
-                              alt={BERKAS_LABELS[key]}
-                              className="upload-preview"
-                            />
-                          ) : (
-                            <FileText size={32} color="#1C5C38" />
-                          )
+                        {hasFile ? (
+                          <div
+                            className="upload-file-row"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {key === "foto" && preview ? (
+                              <img
+                                src={preview}
+                                alt={BERKAS_LABELS[key]}
+                                className="upload-preview"
+                              />
+                            ) : (
+                              <FileText size={28} color="#1C5C38" />
+                            )}
+                            <div className="upload-file-info">
+                              <div className="upload-file-name">
+                                {meta?.name ?? BERKAS_LABELS[key]}
+                              </div>
+                              {meta && meta.size > 0 && (
+                                <div className="upload-file-size">
+                                  {formatFileSize(meta.size)}
+                                </div>
+                              )}
+                            </div>
+                            {!alreadySubmitted && (
+                              <button
+                                type="button"
+                                className="upload-remove"
+                                aria-label="Hapus file"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  clearBerkas(key);
+                                }}
+                              >
+                                <X size={14} />
+                              </button>
+                            )}
+                          </div>
                         ) : (
-                          <Upload size={28} color="#6B7280" />
+                          <>
+                            <FileText size={28} color="#6B7280" />
+                            <p>Klik untuk upload atau drag &amp; drop</p>
+                            <span>{hint}</span>
+                          </>
                         )}
-                        <p>{BERKAS_LABELS[key]}</p>
-                        <span>Seret file atau klik · maks. 5 MB</span>
                       </div>
-                      {hasFile && !alreadySubmitted && (
-                        <button
-                          type="button"
-                          className="upload-clear"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            clearBerkas(key);
-                          }}
-                        >
-                          <X size={12} /> Hapus
-                        </button>
-                      )}
                     </div>
                   );
                 })}
@@ -1335,23 +1583,24 @@ export default function PendaftaranPage() {
           {step === 5 && (
             <>
               <h2 className="form-section-title">Review & Kirim</h2>
-              <p style={{ fontSize: 13, color: "#6B7280", marginBottom: 20 }}>
-                Periksa kembali seluruh data sebelum mengirim pendaftaran.
-              </p>
               <div className="review-grid">
                 <div className="review-block">
                   <div className="review-block-title">Data Diri</div>
-                  <dl className="review-rows">
-                    <div className="review-row">
+                  <div className="review-rows review-grid-2">
+                    <div className="review-field">
                       <dt>Nama Lengkap</dt>
                       <dd>{form.nama_lengkap || "—"}</dd>
                     </div>
-                    <div className="review-row">
-                      <dt>Nama Panggilan</dt>
-                      <dd>{form.nama_panggilan || "—"}</dd>
+                    <div className="review-field">
+                      <dt>NISN</dt>
+                      <dd>{form.nisn || "—"}</dd>
                     </div>
-                    <div className="review-row">
-                      <dt>TTL</dt>
+                    <div className="review-field">
+                      <dt>NIK</dt>
+                      <dd>{form.nik || "—"}</dd>
+                    </div>
+                    <div className="review-field">
+                      <dt>Tempat, Tanggal Lahir</dt>
                       <dd>
                         {form.tempat_lahir || "—"}
                         {form.tanggal_lahir
@@ -1359,100 +1608,108 @@ export default function PendaftaranPage() {
                           : ""}
                       </dd>
                     </div>
-                    <div className="review-row">
-                      <dt>Jenis Kelamin</dt>
-                      <dd>
-                        {form.jenis_kelamin === "L"
-                          ? "Laki-laki"
-                          : form.jenis_kelamin === "P"
-                            ? "Perempuan"
-                            : "—"}
-                      </dd>
+                    <div className="review-field">
+                      <dt>Jurusan</dt>
+                      <dd>{jurusanName}</dd>
                     </div>
-                    <div className="review-row">
-                      <dt>Agama</dt>
-                      <dd>{form.agama || "—"}</dd>
+                    <div className="review-field">
+                      <dt>Asal Sekolah</dt>
+                      <dd>{form.asal_sekolah || "—"}</dd>
                     </div>
-                    <div className="review-row">
+                    <div className="review-field" style={{ gridColumn: "1 / -1" }}>
                       <dt>Alamat</dt>
                       <dd>{form.alamat_lengkap || "—"}</dd>
                     </div>
-                    <div className="review-row">
-                      <dt>No. HP</dt>
-                      <dd>{form.no_pribadi || "—"}</dd>
-                    </div>
-                  </dl>
+                  </div>
                 </div>
 
                 <div className="review-block">
                   <div className="review-block-title">Data Akademik</div>
-                  <dl className="review-rows">
-                    <div className="review-row">
-                      <dt>NISN</dt>
-                      <dd>{form.nisn || "—"}</dd>
+                  <div className="review-rows review-grid-2">
+                    <div className="review-field">
+                      <dt>Nilai Rata-rata Rapor</dt>
+                      <dd>{form.nilai_rata_rata || "—"}</dd>
                     </div>
-                    <div className="review-row">
-                      <dt>NIK</dt>
-                      <dd>{form.nik || "—"}</dd>
+                    <div className="review-field" style={{ gridColumn: "1 / -1" }}>
+                      <dt>Prestasi / Penghargaan</dt>
+                      <dd>{form.prestasi.trim() || "—"}</dd>
                     </div>
-                    <div className="review-row">
-                      <dt>Asal Sekolah</dt>
-                      <dd>{form.asal_sekolah || "—"}</dd>
-                    </div>
-                    <div className="review-row">
-                      <dt>Jurusan</dt>
-                      <dd>{jurusanName}</dd>
-                    </div>
-                  </dl>
+                  </div>
                 </div>
 
                 <div className="review-block">
-                  <div className="review-block-title">Orang Tua</div>
-                  <dl className="review-rows">
-                    <div className="review-row">
+                  <div className="review-block-title">Data Orang Tua</div>
+                  <div className="review-rows review-grid-2">
+                    <div className="review-field">
                       <dt>Nama Ayah</dt>
                       <dd>{form.nama_ayah || "—"}</dd>
                     </div>
-                    <div className="review-row">
+                    <div className="review-field">
                       <dt>Nama Ibu</dt>
                       <dd>{form.nama_ibu || "—"}</dd>
                     </div>
-                    <div className="review-row">
-                      <dt>No. HP Ortu</dt>
-                      <dd>{form.no_ortu || "—"}</dd>
-                    </div>
-                    <div className="review-row">
+                    <div className="review-field">
                       <dt>Pekerjaan Ayah</dt>
                       <dd>{form.pekerjaan_ayah || "—"}</dd>
                     </div>
-                    <div className="review-row">
+                    <div className="review-field">
                       <dt>Pekerjaan Ibu</dt>
                       <dd>{form.pekerjaan_ibu || "—"}</dd>
                     </div>
-                  </dl>
+                    <div className="review-field" style={{ gridColumn: "1 / -1" }}>
+                      <dt>Nomor WhatsApp</dt>
+                      <dd>{form.no_ortu || "—"}</dd>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="review-block">
-                  <div className="review-block-title">Berkas</div>
-                  <dl className="review-rows">
-                    {(["foto", "ijazah", "rapor", "kk"] as BerkasKey[]).map((key) => (
-                      <div className="review-row" key={key}>
-                        <dt>{BERKAS_LABELS[key]}</dt>
-                        <dd>
-                          {berkasUrls[key] || berkasFiles[key]
-                            ? "✓ Terunggah"
-                            : "Belum"}
-                        </dd>
-                      </div>
-                    ))}
-                  </dl>
+                  <div className="review-block-title">Kelengkapan Berkas</div>
+                  <div className="review-rows berkas-checklist">
+                    {(["foto", "ijazah", "rapor", "kk"] as BerkasKey[]).map((key) => {
+                      const ok = hasBerkas(key);
+                      const fileName = berkasDisplayName(key);
+                      return (
+                        <div className="berkas-check-item" key={key}>
+                          {ok ? (
+                            <Check
+                              size={16}
+                              strokeWidth={3}
+                              className="berkas-check-icon ok"
+                            />
+                          ) : (
+                            <X
+                              size={16}
+                              strokeWidth={3}
+                              className="berkas-check-icon no"
+                            />
+                          )}
+                          <div>
+                            <div className="berkas-check-label">{BERKAS_LABELS[key]}</div>
+                            {ok && fileName && (
+                              <div className="berkas-check-file">{fileName}</div>
+                            )}
+                            {!ok && (
+                              <div className="berkas-check-file">Belum diunggah</div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
+              </div>
+
+              <div className="disclaimer-box">
+                Pastikan semua data sudah benar. Data yang telah dikirim tidak dapat diubah.
               </div>
             </>
           )}
 
           {!alreadySubmitted && (
-            <div className="form-actions">
+            <div
+              className={`form-actions${step === 5 ? " form-actions-step5" : ""}`}
+            >
               {step > 1 ? (
                 <button
                   type="button"
@@ -1479,9 +1736,9 @@ export default function PendaftaranPage() {
               ) : (
                 <button
                   type="button"
-                  className="btn-next"
+                  className="btn-submit-full"
                   onClick={handleSubmit}
-                  disabled={submitting}
+                  disabled={submitting || berkasIncomplete}
                 >
                   {submitting ? "Mengirim..." : "Kirim Pendaftaran"}
                   <ArrowRight size={16} />

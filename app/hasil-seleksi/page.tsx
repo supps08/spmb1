@@ -87,6 +87,7 @@ export default function HasilSeleksiPage() {
   const [hasil, setHasil] = useState<HasilSeleksi | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
 
   async function handleCek() {
     const cleaned = nisn.trim().replace(/\D/g, "");
@@ -148,6 +149,15 @@ export default function HasilSeleksiPage() {
     return new Date(ts).toLocaleDateString("id-ID", {
       day: "numeric",
       month: "long",
+      year: "numeric",
+    });
+  }
+
+  function formatDateShort(ts: string | null) {
+    if (!ts) return "-";
+    return new Date(ts).toLocaleDateString("id-ID", {
+      day: "2-digit",
+      month: "short",
       year: "numeric",
     });
   }
@@ -549,6 +559,76 @@ export default function HasilSeleksiPage() {
           background: var(--accent-hover);
         }
 
+        .timeline-section {
+          padding: 20px 28px 24px;
+          border-bottom: 1px solid var(--border);
+        }
+
+        .timeline-track {
+          display: flex;
+          align-items: flex-start;
+          gap: 0;
+          width: 100%;
+        }
+
+        .timeline-step {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          flex-shrink: 0;
+        }
+
+        .timeline-dot {
+          width: 12px;
+          height: 12px;
+          border-radius: 50%;
+          flex-shrink: 0;
+        }
+
+        .timeline-dot.filled {
+          background: #1C5C38;
+        }
+
+        .timeline-dot.filled.active {
+          animation: pulse-ring 1.5s ease-out infinite;
+        }
+
+        .timeline-dot.empty {
+          border: 2px solid #E5E7EB;
+          background: white;
+        }
+
+        .timeline-connector {
+          flex: 1;
+          height: 2px;
+          align-self: center;
+          min-width: 12px;
+        }
+
+        .timeline-label {
+          font-size: 11px;
+          font-weight: 500;
+          color: #6B7280;
+          text-align: center;
+          max-width: 80px;
+          margin-top: 8px;
+          line-height: 1.3;
+        }
+
+        .timeline-date {
+          font-size: 10px;
+          color: #9CA3AF;
+          text-align: center;
+          max-width: 80px;
+          margin-top: 2px;
+          line-height: 1.3;
+        }
+
+        @keyframes pulse-ring {
+          0% { box-shadow: 0 0 0 0 rgba(28,92,56,0.4); }
+          100% { box-shadow: 0 0 0 8px rgba(28,92,56,0); }
+        }
+
         @media (max-width: 600px) {
           .search-row { flex-direction: column; }
           .detail-grid { grid-template-columns: 1fr; }
@@ -604,6 +684,7 @@ export default function HasilSeleksiPage() {
                 setError("");
                 setNotFound(false);
                 setHasil(null);
+                setCopied(false);
               }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleCek();
@@ -658,6 +739,90 @@ export default function HasilSeleksiPage() {
               </div>
             </div>
 
+            {(() => {
+              const step1Filled = !!hasil.submitted_at;
+              const step2Filled = !!hasil.verified_at;
+              const step3Filled =
+                hasil.status === "diterima" || hasil.status === "ditolak";
+              const step4Filled = hasil.status === "diterima";
+              const filledSteps = [
+                step1Filled,
+                step2Filled,
+                step3Filled,
+                step4Filled,
+              ];
+              const lastActiveIdx = filledSteps.lastIndexOf(true);
+
+              const steps: {
+                key: string;
+                label: string;
+                date: string;
+                filled: boolean;
+              }[] = [
+                {
+                  key: "pendaftaran",
+                  label: "Pendaftaran Diterima",
+                  date: formatDateShort(hasil.submitted_at),
+                  filled: step1Filled,
+                },
+                {
+                  key: "verifikasi",
+                  label: "Berkas Diverifikasi",
+                  date: hasil.verified_at
+                    ? formatDateShort(hasil.verified_at)
+                    : "Menunggu verifikasi",
+                  filled: step2Filled,
+                },
+              ];
+
+              if (step3Filled) {
+                steps.push({
+                  key: "seleksi",
+                  label: "Hasil Seleksi",
+                  date: formatDateShort(hasil.verified_at),
+                  filled: step3Filled,
+                });
+              }
+
+              if (hasil.status === "diterima") {
+                steps.push({
+                  key: "daftar-ulang",
+                  label: "Daftar Ulang",
+                  date: "Menunggu daftar ulang",
+                  filled: step4Filled,
+                });
+              }
+
+              return (
+                <div className="timeline-section">
+                  <div className="timeline-track">
+                    {steps.map((step, idx) => (
+                      <span key={step.key} style={{ display: "contents" }}>
+                        {idx > 0 && (
+                          <div
+                            className="timeline-connector"
+                            style={{
+                              background:
+                                step.filled && steps[idx - 1].filled
+                                  ? "#1C5C38"
+                                  : "#E5E7EB",
+                            }}
+                          />
+                        )}
+                        <div className="timeline-step">
+                          <div
+                            className={`timeline-dot ${step.filled ? "filled" : "empty"}${step.filled && idx === lastActiveIdx ? " active" : ""}`}
+                          />
+                          <div className="timeline-label">{step.label}</div>
+                          <div className="timeline-date">{step.date}</div>
+                        </div>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
             <div className="detail-section">
               <div className="detail-section-title">Data Pendaftar</div>
               <div className="detail-grid">
@@ -668,7 +833,30 @@ export default function HasilSeleksiPage() {
                 <div>
                   <div className="detail-key">NISN</div>
                   <div className="detail-val" style={{ fontFamily: "monospace" }}>
-                    {hasil.nisn}
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span>{hasil.nisn}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(hasil.nisn);
+                          setCopied(true);
+                          setTimeout(() => setCopied(false), 2000);
+                        }}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                          color: copied ? "#1C5C38" : "#9CA3AF",
+                          fontSize: 12,
+                          padding: "2px 8px",
+                          borderRadius: 4,
+                          transition: "color 0.2s",
+                          fontFamily: "inherit",
+                        }}
+                      >
+                        {copied ? "✓ Disalin" : "Salin"}
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <div>
@@ -721,6 +909,7 @@ export default function HasilSeleksiPage() {
                   setHasil(null);
                   setNisn("");
                   setNotFound(false);
+                  setCopied(false);
                 }}
               >
                 Cek NISN Lain
