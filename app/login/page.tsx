@@ -336,10 +336,6 @@ export default function LoginPage() {
             {loading ? "Memverifikasi..." : "Masuk →"}
           </button>
         </form>
-
-        <div className="footer-note">
-          Demo: <span>admin@spmb.com</span> / <span>admin123</span>
-        </div>
       </div>
     </>
   );

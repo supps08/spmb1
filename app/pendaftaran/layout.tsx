@@ -152,7 +152,7 @@ export default function PendaftaranLayout({ children }: { children: React.ReactN
             <div className="trust-badge-icon blue">🎧</div>
             <div>
               <div className="trust-badge-title blue">Butuh Bantuan?</div>
-              <div className="trust-badge-desc">Hubungi CS kami di 0800-123-456.</div>
+              <div className="trust-badge-desc">Hubungi CS kami di (021) 77201052.</div>
             </div>
           </div>
         </div>
