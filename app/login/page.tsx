@@ -50,67 +50,64 @@ export default function LoginPage() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=DM+Sans:wght@300;400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap');
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
         :root {
-          --cream:       #FDF6EE;
-          --cream-dark:  #F5EAD8;
-          --blush:       #F2C4C4;
-          --blush-light: #FAE8E8;
-          --sage:        #C8DDD1;
-          --lavender:    #DDD2EE;
-          --warm-brown:  #8B6B52;
-          --text-dark:   #3D2B1F;
-          --text-mid:    #7A5C48;
-          --text-light:  #B89A86;
-          --white:       #FFFFFF;
-          --shadow:      rgba(139,107,82,0.15);
+          --green:        #1C5C38;
+          --green-hover:  #2A7A4E;
+          --text-dark:    #0C0C0C;
+          --card-bg:      rgba(255, 255, 255, 0.12);
+          --card-border:  rgba(255, 255, 255, 0.2);
+          --input-bg:     rgba(255, 255, 255, 0.9);
+          --input-border: rgba(255, 255, 255, 0.4);
         }
 
         body {
-          font-family: 'DM Sans', sans-serif;
-          background: var(--cream);
+          font-family: 'Plus Jakarta Sans', sans-serif;
+          min-height: 100vh;
+          margin: 0;
+        }
+
+        .auth-page {
           min-height: 100vh;
           display: flex;
           align-items: center;
           justify-content: center;
           position: relative;
           overflow: hidden;
+          padding: 24px 16px;
         }
 
-        /* Decorative blobs */
-        body::before, body::after {
-          content: '';
+        .auth-bg {
           position: fixed;
-          border-radius: 50%;
-          filter: blur(70px);
-          opacity: 0.45;
-          pointer-events: none;
-        }
-        body::before {
-          width: 500px; height: 500px;
-          background: radial-gradient(circle, var(--blush) 0%, transparent 70%);
-          top: -150px; right: -100px;
-        }
-        body::after {
-          width: 400px; height: 400px;
-          background: radial-gradient(circle, var(--sage) 0%, transparent 70%);
-          bottom: -120px; left: -80px;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          z-index: 0;
         }
 
-        .login-card {
-          background: var(--white);
-          border-radius: 28px;
-          padding: 52px 48px;
-          width: 420px;
-          box-shadow:
-            0 4px 24px var(--shadow),
-            0 1px 4px rgba(139,107,82,0.08);
+        .auth-content {
           position: relative;
           z-index: 1;
-          animation: floatIn .5s cubic-bezier(.22,1,.36,1) both;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          width: 100%;
+          max-width: 440px;
+        }
+
+        .auth-card {
+          background: var(--card-bg);
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
+          border: 1px solid var(--card-border);
+          border-radius: 24px;
+          padding: 48px 40px;
+          width: 100%;
+          animation: floatIn .5s cubic-bezier(.22, 1, .36, 1) both;
         }
 
         @keyframes floatIn {
@@ -118,86 +115,108 @@ export default function LoginPage() {
           to   { opacity: 1; transform: translateY(0); }
         }
 
-        /* Accent bar top */
-        .login-card::before {
-          content: '';
-          position: absolute;
-          top: 0; left: 32px; right: 32px;
-          height: 4px;
-          border-radius: 0 0 8px 8px;
-          background: linear-gradient(90deg, var(--blush), var(--lavender), var(--sage));
-        }
-
         .brand {
           text-align: center;
-          margin-bottom: 36px;
+          margin-bottom: 32px;
         }
+
         .brand-icon {
-          width: 56px; height: 56px;
-          background: linear-gradient(135deg, var(--blush-light), var(--cream-dark));
-          border-radius: 16px;
-          display: flex; align-items: center; justify-content: center;
-          margin: 0 auto 14px;
+          width: 56px;
+          height: 56px;
+          background: var(--green);
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin: 0 auto 16px;
           font-size: 26px;
-          border: 1px solid var(--blush);
         }
+
         .brand h1 {
-          font-family: 'Playfair Display', serif;
+          font-family: 'Bricolage Grotesque', sans-serif;
           font-size: 22px;
+          font-weight: 700;
           color: var(--text-dark);
-          font-weight: 600;
           letter-spacing: -0.3px;
+          line-height: 1.3;
         }
+
         .brand p {
           font-size: 13px;
-          color: var(--text-light);
-          margin-top: 5px;
-          font-weight: 300;
+          color: var(--text-dark);
+          margin-top: 8px;
+          font-weight: 400;
+          line-height: 1.6;
+          opacity: 0.75;
         }
 
         .form-group {
           margin-bottom: 20px;
         }
+
         label {
           display: block;
-          font-size: 12.5px;
-          font-weight: 500;
-          color: var(--text-mid);
+          font-size: 13px;
+          font-weight: 600;
+          color: var(--text-dark);
           margin-bottom: 8px;
-          letter-spacing: 0.3px;
-          text-transform: uppercase;
+        }
+
+        .label-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 8px;
+        }
+
+        .label-row label {
+          margin-bottom: 0;
+        }
+
+        .forgot-link {
+          font-size: 12px;
+          font-weight: 500;
+          color: var(--green);
+          text-decoration: none;
+        }
+
+        .forgot-link:hover {
+          text-decoration: underline;
         }
 
         .input-wrap {
           position: relative;
         }
+
         .input-wrap svg {
           position: absolute;
           left: 14px;
           top: 50%;
           transform: translateY(-50%);
+          color: var(--text-dark);
           opacity: 0.45;
           pointer-events: none;
         }
 
         input[type="email"],
         input[type="password"],
-        input[type="text"] {
+        input[type="text"],
+        input[type="tel"] {
           width: 100%;
-          padding: 13px 14px 13px 42px;
-          border: 1.5px solid var(--cream-dark);
-          border-radius: 12px;
-          font-family: 'DM Sans', sans-serif;
-          font-size: 14.5px;
+          padding: 13px 44px 13px 42px;
+          border: 1.5px solid var(--input-border);
+          border-radius: 10px;
+          font-family: 'Plus Jakarta Sans', sans-serif;
+          font-size: 14px;
           color: var(--text-dark);
-          background: var(--cream);
-          transition: border-color .2s, box-shadow .2s, background .2s;
+          background: var(--input-bg);
+          transition: border-color .2s, box-shadow .2s;
           outline: none;
         }
+
         input:focus {
-          border-color: var(--blush);
-          background: var(--white);
-          box-shadow: 0 0 0 4px rgba(242,196,196,0.2);
+          border-color: var(--green);
+          box-shadow: 0 0 0 3px rgba(28, 92, 56, 0.15);
         }
 
         .toggle-pass {
@@ -208,16 +227,18 @@ export default function LoginPage() {
           background: none;
           border: none;
           cursor: pointer;
-          color: var(--text-light);
+          color: var(--text-dark);
+          opacity: 0.5;
           font-size: 18px;
           padding: 2px;
-          transition: color .2s;
+          transition: opacity .2s;
         }
-        .toggle-pass:hover { color: var(--warm-brown); }
+
+        .toggle-pass:hover { opacity: 0.8; }
 
         .error-msg {
-          background: #FFF0F0;
-          border: 1px solid #F2C4C4;
+          background: rgba(255, 240, 240, 0.9);
+          border: 1px solid rgba(242, 196, 196, 0.8);
           border-radius: 10px;
           padding: 11px 14px;
           font-size: 13px;
@@ -228,114 +249,138 @@ export default function LoginPage() {
           gap: 8px;
           animation: shake .3s ease;
         }
+
         @keyframes shake {
-          0%,100% { transform: translateX(0); }
+          0%, 100% { transform: translateX(0); }
           25% { transform: translateX(-5px); }
           75% { transform: translateX(5px); }
         }
 
-        .btn-login {
+        .btn-submit {
           width: 100%;
           padding: 14px;
-          background: linear-gradient(135deg, var(--warm-brown), #A0785A);
-          color: var(--white);
+          background: var(--green);
+          color: #FFFFFF;
           border: none;
           border-radius: 12px;
-          font-family: 'DM Sans', sans-serif;
+          font-family: 'Plus Jakarta Sans', sans-serif;
           font-size: 15px;
-          font-weight: 500;
+          font-weight: 600;
           cursor: pointer;
-          letter-spacing: 0.3px;
-          transition: transform .15s, box-shadow .15s, opacity .15s;
-          box-shadow: 0 4px 16px rgba(139,107,82,0.3);
+          transition: background .2s, opacity .2s;
           margin-top: 8px;
         }
-        .btn-login:hover:not(:disabled) {
-          transform: translateY(-1px);
-          box-shadow: 0 6px 20px rgba(139,107,82,0.4);
-        }
-        .btn-login:active:not(:disabled) { transform: translateY(0); }
-        .btn-login:disabled { opacity: 0.65; cursor: not-allowed; }
 
-        .footer-note {
+        .btn-submit:hover:not(:disabled) {
+          background: var(--green-hover);
+        }
+
+        .btn-submit:disabled {
+          opacity: 0.65;
+          cursor: not-allowed;
+        }
+
+        .card-footer {
           text-align: center;
-          font-size: 12px;
-          color: var(--text-light);
+          font-size: 13px;
+          color: var(--text-dark);
           margin-top: 24px;
-        }
-        .footer-note span {
-          display: inline-block;
-          background: var(--cream-dark);
-          border-radius: 6px;
-          padding: 4px 10px;
-          font-weight: 500;
-          color: var(--text-mid);
+          opacity: 0.75;
         }
 
-        .lavender-dot {
-          display: inline-block;
-          width: 8px; height: 8px;
-          border-radius: 50%;
-          background: var(--lavender);
-          margin-right: 6px;
+        .card-footer a {
+          color: var(--green);
+          font-weight: 600;
+          text-decoration: none;
+        }
+
+        .card-footer a:hover {
+          text-decoration: underline;
+        }
+
+        .page-footer {
+          margin-top: 20px;
+          font-size: 11px;
+          color: #FFFFFF;
+          opacity: 0.5;
+          text-align: center;
         }
       `}</style>
 
-      <div className="login-card">
-        <div className="brand">
-          <div className="brand-icon">🎓</div>
-          <h1>SPMB Dashboard</h1>
-          <p>Sistem Penerimaan Mahasiswa Baru</p>
-        </div>
+      <div className="auth-page">
+        <img
+          className="auth-bg"
+          src="https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=1600"
+          alt=""
+        />
 
-        {error && (
-          <div className="error-msg">
-            <span>⚠️</span> {error}
-          </div>
-        )}
-
-        <form onSubmit={handleLogin}>
-          <div className="form-group">
-            <label>Email</label>
-            <div className="input-wrap">
-              <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-              </svg>
-              <input
-                type="email"
-                placeholder="email@spmb.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoComplete="email"
-              />
+        <div className="auth-content">
+          <div className="auth-card">
+            <div className="brand">
+              <div className="brand-icon">🎓</div>
+              <h1>Login Pendaftaran Citra Negara</h1>
+              <p>Masuk ke portal pendaftaran Citra Negara untuk melanjutkan proses admisi Anda.</p>
             </div>
-          </div>
 
-          <div className="form-group">
-            <label>Password</label>
-            <div className="input-wrap">
-              <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-              </svg>
-              <input
-                type={showPass ? "text" : "password"}
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoComplete="current-password"
-              />
-              <button type="button" className="toggle-pass" onClick={() => setShowPass(!showPass)}>
-                {showPass ? "🙈" : "👁️"}
+            {error && (
+              <div className="error-msg">
+                <span>⚠️</span> {error}
+              </div>
+            )}
+
+            <form onSubmit={handleLogin}>
+              <div className="form-group">
+                <label>Email atau Username</label>
+                <div className="input-wrap">
+                  <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                  </svg>
+                  <input
+                    type="text"
+                    placeholder="email@spmb.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    autoComplete="username"
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <div className="label-row">
+                  <label>Kata Sandi</label>
+                  <a href="#" className="forgot-link">Lupa Password?</a>
+                </div>
+                <div className="input-wrap">
+                  <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                  </svg>
+                  <input
+                    type={showPass ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    autoComplete="current-password"
+                  />
+                  <button type="button" className="toggle-pass" onClick={() => setShowPass(!showPass)}>
+                    {showPass ? "🙈" : "👁️"}
+                  </button>
+                </div>
+              </div>
+
+              <button type="submit" className="btn-submit" disabled={loading}>
+                {loading ? "Memverifikasi..." : "Masuk Sekarang →"}
               </button>
+            </form>
+
+            <div className="card-footer">
+              Belum punya akun? <a href="/register">Daftar Sekarang</a>
             </div>
           </div>
 
-          <button type="submit" className="btn-login" disabled={loading}>
-            {loading ? "Memverifikasi..." : "Masuk →"}
-          </button>
-        </form>
+          <p className="page-footer">© 2026 SMK Citra Negara. All rights reserved</p>
+        </div>
       </div>
     </>
   );
