@@ -98,20 +98,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     setUser(data.user);
   }, [router]);
 
-  const fetchNotifications = useCallback(async () => {
-    const res = await fetch("/api/notifications");
-    if (res.ok) {
-      const data = await res.json();
-      setNotifications(data.notifications ?? []);
-    }
-  }, []);
+  // TODO: aktifkan setelah /api/notifications dibuat
+  // const fetchNotifications = useCallback(async () => {
+  //   const res = await fetch("/api/notifications");
+  //   if (res.ok) {
+  //     const data = await res.json();
+  //     setNotifications(data.notifications ?? []);
+  //   }
+  // }, []);
 
   useEffect(() => {
     fetchUser();
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 10000);
-    return () => clearInterval(interval);
-  }, [fetchUser, fetchNotifications]);
+    // TODO: aktifkan setelah /api/notifications dibuat
+    // fetchNotifications();
+    // const interval = setInterval(fetchNotifications, 10000);
+    // return () => clearInterval(interval);
+  }, [fetchUser]);
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -173,7 +175,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
         :root {
-          color-scheme: light;
           --color-primary: #1C5C38;
           --color-primary-light: #EBF4EE;
           --color-primary-soft: #F2F8F4;

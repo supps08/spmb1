@@ -8,7 +8,7 @@
 
 "use client";
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import {
   Search,
@@ -87,23 +87,19 @@ export default function HasilSeleksiPage() {
   const [hasil, setHasil] = useState<HasilSeleksi | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState("");
-  const isSearching = useRef(false);
 
   async function handleCek() {
-    if (isSearching.current) return; // hard guard — tolak spam
-    
     const cleaned = nisn.trim().replace(/\D/g, "");
     if (cleaned.length !== 10) {
       setError("NISN harus 10 digit angka.");
       return;
     }
-  
-    isSearching.current = true;
+
     setLoading(true);
     setError("");
     setNotFound(false);
     setHasil(null);
-  
+
     const { data, error: dbError } = await supabase
       .from("siswa")
       .select(`
@@ -122,20 +118,19 @@ export default function HasilSeleksiPage() {
       .eq("nisn", cleaned)
       .neq("status", "draft")
       .single();
-  
+
     setLoading(false);
-    isSearching.current = false;
-  
+
     if (dbError || !data) {
       setNotFound(true);
       return;
     }
-  
+
     const jurusanRaw = data.jurusan;
     const jurusan = Array.isArray(jurusanRaw)
       ? jurusanRaw[0] ?? null
       : jurusanRaw ?? null;
-  
+
     setHasil({
       nama_lengkap: data.nama_lengkap ?? "-",
       nisn: data.nisn ?? cleaned,
@@ -553,11 +548,6 @@ export default function HasilSeleksiPage() {
         .btn-link:hover {
           background: var(--accent-hover);
         }
-
-        @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(16px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
 
         @media (max-width: 600px) {
           .search-row { flex-direction: column; }
