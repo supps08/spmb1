@@ -173,6 +173,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
         :root {
+          color-scheme: light;
           --color-primary: #1C5C38;
           --color-primary-light: #EBF4EE;
           --color-primary-soft: #F2F8F4;

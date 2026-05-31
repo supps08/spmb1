@@ -30,9 +30,15 @@ export default function LoginPage() {
       if (!res.ok) {
         setError(data.error || "Login gagal.");
       } else {
-        // Simpan email untuk autocomplete berikutnya
         localStorage.setItem("spmb_last_email", email);
-        router.push("/dashboard");
+        // Redirect berdasarkan role:
+        // admin → /dashboard
+        // user biasa → /pendaftaran
+        if (data.user?.role === "admin") {
+          router.push("/dashboard");
+        } else {
+          router.push("/pendaftaran");
+        }
       }
     } catch {
       setError("Koneksi gagal. Coba lagi.");
