@@ -15,6 +15,7 @@ import {
   ArrowLeft,
   FileText,
   X,
+  Clock,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useScrollAnimation } from "@/lib/useScrollAnimation";
@@ -26,6 +27,14 @@ const STEPS = [
   "Upload Berkas",
   "Review",
 ] as const;
+
+const ESTIMASI: Record<number, string> = {
+  1: "~5 menit",
+  2: "~2 menit",
+  3: "~3 menit",
+  4: "~5 menit",
+  5: "~1 menit",
+};
 
 const AGAMA_OPTIONS = ["Islam", "Kristen", "Katolik", "Hindu", "Buddha", "Konghucu"];
 
@@ -271,6 +280,23 @@ export default function PendaftaranPage() {
 
     load();
   }, [supabase, router, showToast]);
+
+  useEffect(() => {
+    // Aktifkan warning saat form sudah mulai diisi tapi belum submit
+    const isDirty = step > 1 || Object.values(form).some(v =>
+      typeof v === 'string' ? v.trim() !== '' : Boolean(v)
+    );
+
+    if (!isDirty || alreadySubmitted) return;
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [step, form, alreadySubmitted]);
 
   function validateStep(current: number): string[] {
     const errs: string[] = [];
@@ -1201,6 +1227,23 @@ export default function PendaftaranPage() {
         <p className="pend-progress-text">
           Tahap {step} dari {STEPS.length}
         </p>
+      </div>
+
+      <div
+        style={{
+          textAlign: "center",
+          marginBottom: 16,
+          fontSize: 13,
+          color: "#6B7280",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 6,
+        }}
+      >
+        <Clock size={14} />
+        Estimasi tahap ini:{" "}
+        <strong style={{ color: "#1C5C38" }}>{ESTIMASI[step]}</strong>
       </div>
 
       <div className="form-card" data-animate data-delay="100">
