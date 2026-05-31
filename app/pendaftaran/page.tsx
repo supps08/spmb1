@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useScrollAnimation } from "@/lib/useScrollAnimation";
+import { useCountdown } from "@/lib/useCountdown";
 
 const STEPS = [
   "Data Diri",
@@ -168,6 +169,8 @@ export default function PendaftaranPage() {
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
   const [dragBerkas, setDragBerkas] = useState<BerkasKey | null>(null);
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
+  const [tanggalTutup, setTanggalTutup] = useState<string | null>(null);
+  const countdown = useCountdown(tanggalTutup);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const lastSavedRef = useRef<Date | null>(null);
   const [lastSavedText, setLastSavedText] = useState("");
@@ -285,6 +288,13 @@ export default function PendaftaranPage() {
           kk: berkas.kk_url ?? "",
         });
       }
+
+      const { data: setting } = await supabase
+        .from("pengaturan_sistem")
+        .select("value")
+        .eq("key", "tanggal_tutup")
+        .single();
+      if (setting) setTanggalTutup(setting.value);
 
       setLoading(false);
     }
@@ -1235,6 +1245,50 @@ export default function PendaftaranPage() {
           }
         }
       `}</style>
+
+      <div style={{ textAlign: "center" }}>
+        {!countdown.isExpired && tanggalTutup && (
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              background: "#FEF3C7",
+              border: "1px solid #F59E0B",
+              borderRadius: 9999,
+              padding: "6px 16px",
+              fontSize: 13,
+              color: "#92400E",
+              marginBottom: 16,
+            }}
+          >
+            <span>⏰</span>
+            Pendaftaran ditutup dalam{" "}
+            <strong>
+              {countdown.days > 0 && `${countdown.days} hari `}
+              {countdown.hours} jam {countdown.minutes} menit
+            </strong>
+          </div>
+        )}
+        {countdown.isExpired && (
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              background: "#FEE2E2",
+              border: "1px solid #DC2626",
+              borderRadius: 9999,
+              padding: "6px 16px",
+              fontSize: 13,
+              color: "#991B1B",
+              marginBottom: 16,
+            }}
+          >
+            <span>🚫</span> Pendaftaran sudah ditutup
+          </div>
+        )}
+      </div>
 
       <div className="pend-stepper-wrap" data-animate data-delay="0">
         <div className="pend-stepper">
