@@ -36,6 +36,14 @@ const ESTIMASI: Record<number, string> = {
   5: "~1 menit",
 };
 
+function formatLastSaved(date: Date | null): string {
+  if (!date) return "Tersimpan otomatis";
+  const diffSec = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (diffSec < 60) return "Tersimpan otomatis barusan";
+  const diffMin = Math.floor(diffSec / 60);
+  return `Tersimpan otomatis ${diffMin} menit lalu`;
+}
+
 const AGAMA_OPTIONS = ["Islam", "Kristen", "Katolik", "Hindu", "Buddha", "Konghucu"];
 
 interface Jurusan {
@@ -160,6 +168,9 @@ export default function PendaftaranPage() {
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
   const [dragBerkas, setDragBerkas] = useState<BerkasKey | null>(null);
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const lastSavedRef = useRef<Date | null>(null);
+  const [lastSavedText, setLastSavedText] = useState("");
 
   const showToast = useCallback((msg: string, type: "success" | "error") => {
     setToast({ msg, type });
@@ -297,6 +308,22 @@ export default function PendaftaranPage() {
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [step, form, alreadySubmitted]);
+
+  useEffect(() => {
+    if (saveStatus !== "saved") return;
+    const timer = setTimeout(() => setSaveStatus("idle"), 3000);
+    return () => clearTimeout(timer);
+  }, [saveStatus]);
+
+  useEffect(() => {
+    const tick = () => {
+      if (lastSavedRef.current) {
+        setLastSavedText(formatLastSaved(lastSavedRef.current));
+      }
+    };
+    const interval = setInterval(tick, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   function validateStep(current: number): string[] {
     const errs: string[] = [];
@@ -494,11 +521,16 @@ export default function PendaftaranPage() {
     }
     setErrors([]);
     setSaving(true);
+    setSaveStatus("saving");
     try {
       await persistStep(step);
+      lastSavedRef.current = new Date();
+      setLastSavedText(formatLastSaved(lastSavedRef.current));
+      setSaveStatus("saved");
       setStep((s) => Math.min(s + 1, 5));
       showToast("Data tahap ini berhasil disimpan.", "success");
     } catch (e) {
+      setSaveStatus("idle");
       showToast(e instanceof Error ? e.message : "Gagal menyimpan data.", "error");
     } finally {
       setSaving(false);
@@ -519,8 +551,12 @@ export default function PendaftaranPage() {
     }
     setErrors([]);
     setSubmitting(true);
+    setSaveStatus("saving");
     try {
       await persistStep(4);
+      lastSavedRef.current = new Date();
+      setLastSavedText(formatLastSaved(lastSavedRef.current));
+      setSaveStatus("saved");
       const { error } = await supabase
         .from("siswa")
         .update({
@@ -533,6 +569,7 @@ export default function PendaftaranPage() {
       setAlreadySubmitted(true);
       showToast("Pendaftaran berhasil dikirim!", "success");
     } catch (e) {
+      setSaveStatus("idle");
       showToast(e instanceof Error ? e.message : "Gagal mengirim pendaftaran.", "error");
     } finally {
       setSubmitting(false);
@@ -1748,6 +1785,46 @@ export default function PendaftaranPage() {
               </div>
             </>
           )}
+
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 12,
+              color: "#6B7280",
+              minHeight: 20,
+            }}
+          >
+            {saveStatus === "saving" && (
+              <>
+                <span
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    background: "#F59E0B",
+                    display: "inline-block",
+                  }}
+                />
+                Menyimpan...
+              </>
+            )}
+            {saveStatus === "saved" && (
+              <>
+                <span
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    background: "#10B981",
+                    display: "inline-block",
+                  }}
+                />
+                {lastSavedText || "Tersimpan otomatis"}
+              </>
+            )}
+          </div>
 
           {!alreadySubmitted && (
             <div
