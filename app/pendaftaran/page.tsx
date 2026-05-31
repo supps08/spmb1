@@ -148,6 +148,9 @@ export default function PendaftaranPage() {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<FormData>(EMPTY_FORM);
   const [jurusanList, setJurusanList] = useState<Jurusan[]>([]);
+  const [kuotaData, setKuotaData] = useState<
+    Record<string, { sisa: number; persenTerisi: number; kuota: number }>
+  >({});
   const [siswaId, setSiswaId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [berkasUrls, setBerkasUrls] = useState<Record<BerkasKey, string>>({
@@ -295,6 +298,21 @@ export default function PendaftaranPage() {
         .eq("key", "tanggal_tutup")
         .single();
       if (setting) setTanggalTutup(setting.value);
+
+      try {
+        const res = await fetch("/api/jurusan/kuota");
+        if (res.ok) {
+          const kuota: Array<{
+            id: string;
+            sisa: number;
+            persenTerisi: number;
+            kuota: number;
+          }> = await res.json();
+          setKuotaData(Object.fromEntries(kuota.map((k) => [k.id, k])));
+        }
+      } catch {
+        // kuota opsional — card tetap tampil tanpa progress bar
+      }
 
       setLoading(false);
     }
@@ -1467,20 +1485,71 @@ export default function PendaftaranPage() {
               <div className="form-grid-2">
                 <div className="form-group">
                   <label htmlFor="jurusan_id">Pilihan Jurusan</label>
-                  <select
+                  <div
                     id="jurusan_id"
-                    className="form-select"
-                    value={form.jurusan_id}
-                    onChange={(e) => updateField("jurusan_id", e.target.value)}
-                    disabled={alreadySubmitted}
+                    style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}
                   >
-                    <option value="">Pilih jurusan</option>
-                    {jurusanList.map((j) => (
-                      <option key={j.id} value={j.id}>
-                        {j.kode} — {j.nama}
-                      </option>
-                    ))}
-                  </select>
+                    {jurusanList.map((j) => {
+                      const k = kuotaData[j.id];
+                      const isSelected = form.jurusan_id === j.id;
+                      const almostFull = k && k.persenTerisi >= 80;
+                      return (
+                        <div
+                          key={j.id}
+                          onClick={() => {
+                            if (!alreadySubmitted) updateField("jurusan_id", j.id);
+                          }}
+                          style={{
+                            border: `2px solid ${isSelected ? "#1C5C38" : "#E5E7EB"}`,
+                            borderRadius: 10,
+                            padding: "12px 14px",
+                            cursor: alreadySubmitted ? "not-allowed" : "pointer",
+                            background: isSelected ? "#F2F8F4" : "white",
+                            transition: "all 0.15s",
+                            opacity: alreadySubmitted ? 0.7 : 1,
+                          }}
+                        >
+                          <div style={{ fontWeight: 600, fontSize: 13, color: "#0C0C0C" }}>
+                            {j.kode}
+                          </div>
+                          <div style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>
+                            {j.nama}
+                          </div>
+                          {k && (
+                            <div style={{ marginTop: 8 }}>
+                              <div
+                                style={{
+                                  height: 4,
+                                  background: "#E5E7EB",
+                                  borderRadius: 9999,
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    height: "100%",
+                                    borderRadius: 9999,
+                                    width: `${k.persenTerisi}%`,
+                                    background: almostFull ? "#F59E0B" : "#1C5C38",
+                                    transition: "width 0.3s",
+                                  }}
+                                />
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: 11,
+                                  color: almostFull ? "#D97706" : "#6B7280",
+                                  marginTop: 4,
+                                }}
+                              >
+                                {almostFull ? "⚠ Hampir penuh — " : ""}
+                                {k.sisa} kursi tersisa
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
                 <div className="form-group">
                   <label htmlFor="asal_sekolah">Asal Sekolah</label>
