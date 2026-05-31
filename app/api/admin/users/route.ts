@@ -45,7 +45,7 @@ export async function GET() {
 
   const { data: profiles, error: dbError } = await supabase
     .from("profiles")
-    .select("id, full_name, email, role, created_at")
+    .select("id, full_name, email, role, is_active, created_at")
     .order("created_at", { ascending: false });
 
   if (dbError) {
@@ -53,12 +53,13 @@ export async function GET() {
   }
 
   // Map ke format response yang sama dengan sebelumnya
-  const users: PublicUser[] = (profiles ?? []).map((p) => ({
+  const users = (profiles ?? []).map((p) => ({
     id: p.id,
     name: p.full_name,
     email: p.email,
     role: p.role as "admin" | "user",
     createdAt: p.created_at,
+    is_active: p.is_active ?? true,
   }));
 
   return NextResponse.json({ users });
