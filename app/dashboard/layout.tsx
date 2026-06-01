@@ -58,9 +58,9 @@ interface NavLink {
 
 const navLinks: NavLink[] = [
   { href: "/dashboard", label: "Beranda", icon: LayoutDashboard },
-  { href: "/dashboard/laporan", label: "Laporan", icon: BarChart2 },
-  { href: "/dashboard/users", label: "Manajemen User", icon: Users, adminOnly: true },
   { href: "/dashboard/berita", label: "Berita", icon: Newspaper, adminOnly: true },
+  { href: "/dashboard/laporan", label: "Laporan", icon: BarChart2 },
+  { href: "/dashboard/users", label: "Manajemen Pendaftar", icon: Users, adminOnly: true },
   { href: "/dashboard/history", label: "Riwayat Login", icon: History, adminOnly: true },
   { href: "/dashboard/profile", label: "Profil Saya", icon: UserIcon },
 ];
