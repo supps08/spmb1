@@ -142,9 +142,10 @@ export default function LandingNavbar({ activePage }: LandingNavbarProps) {
           </Link>
           <ul className="ln-links">
             <li><Link href="/" className={activePage === "beranda" ? "active" : ""}>Beranda</Link></li>
+            <li><Link href="/#jurusan">Jurusan</Link></li>
+            <li><Link href="/berita" className={activePage === "berita" ? "active" : ""}>Berita</Link></li>
             <li><Link href="/pendaftaran" className={activePage === "pendaftaran" ? "active" : ""}>Pendaftaran</Link></li>
             <li><Link href="/hasil-seleksi" className={activePage === "hasil-seleksi" ? "active" : ""}>Hasil Seleksi</Link></li>
-            <li><Link href="/berita" className={activePage === "berita" ? "active" : ""}>Berita</Link></li>
           </ul>
           <div style={{ position: "relative", flexShrink: 0 }}>
             {navUser ? (
