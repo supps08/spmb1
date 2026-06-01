@@ -8,7 +8,7 @@ interface NavUser {
 }
 
 interface LandingNavbarProps {
-  activePage?: "beranda" | "pendaftaran" | "hasil-seleksi";
+  activePage?: "beranda" | "pendaftaran" | "hasil-seleksi" | "berita";
 }
 
 export default function LandingNavbar({ activePage }: LandingNavbarProps) {
@@ -144,6 +144,7 @@ export default function LandingNavbar({ activePage }: LandingNavbarProps) {
             <li><Link href="/" className={activePage === "beranda" ? "active" : ""}>Beranda</Link></li>
             <li><Link href="/pendaftaran" className={activePage === "pendaftaran" ? "active" : ""}>Pendaftaran</Link></li>
             <li><Link href="/hasil-seleksi" className={activePage === "hasil-seleksi" ? "active" : ""}>Hasil Seleksi</Link></li>
+            <li><Link href="/berita" className={activePage === "berita" ? "active" : ""}>Berita</Link></li>
           </ul>
           <div style={{ position: "relative", flexShrink: 0 }}>
             {navUser ? (
