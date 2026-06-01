@@ -13,9 +13,11 @@ const PUBLIC_PATHS = [
   "/register",
   "/jurusan",
   "/hasil-seleksi",
+  "/berita",
   "/api/auth/login",
   "/api/auth/register",
   "/api/jurusan/kuota",
+  "/api/berita",
 ];
 
 export async function proxy(request: NextRequest) {
