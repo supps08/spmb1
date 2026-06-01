@@ -562,7 +562,7 @@ export default function DashboardPage() {
             <h3>Histori Login Terkini</h3>
             <span className="live-badge">
               <span className="live-dot" aria-hidden="true" />
-              LIVE · {lastUpdated.toLocaleTimeString("id-ID")}
+              LIVE · {typeof window !== "undefined" ? lastUpdated.toLocaleTimeString("id-ID") : ""}
             </span>
           </div>
 
