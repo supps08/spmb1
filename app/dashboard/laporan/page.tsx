@@ -9,8 +9,9 @@
 
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
-import { FileSpreadsheet } from "lucide-react";
+import { useState, useEffect, useMemo, useCallback, Fragment } from "react";
+import Link from "next/link";
+import { FileSpreadsheet, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import * as XLSX from "xlsx";
 import {
@@ -48,6 +49,15 @@ interface TrendData {
   jumlah: number;
 }
 
+interface JurusanDetailData {
+  total: number;
+  diterima: number;
+  ditolak: number;
+  menunggu: number;
+  avgNilai: number | null;
+  trend7: TrendData[];
+}
+
 const HARI = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
 
 export default function LaporanPage() {
@@ -68,6 +78,11 @@ export default function LaporanPage() {
   const [exporting, setExporting] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
   const [pengaturan, setPengaturan] = useState<Record<string, string>>({});
+  const [expandedJurusan, setExpandedJurusan] = useState<string | null>(null);
+  const [jurusanDetails, setJurusanDetails] = useState<
+    Record<string, JurusanDetailData>
+  >({});
+  const [loadingDetailId, setLoadingDetailId] = useState<string | null>(null);
 
   const showToast = useCallback((msg: string, type: "success" | "error") => {
     setToast({ msg, type });
@@ -164,20 +179,104 @@ export default function LaporanPage() {
     return hari > 0 ? hari : 0;
   }
 
-  async function exportExcel() {
+  const fetchJurusanDetail = useCallback(
+    async (jurusanId: string) => {
+      setLoadingDetailId(jurusanId);
+      try {
+        const { data: siswaList } = await supabase
+          .from("siswa")
+          .select("status, nilai_rata_rata, submitted_at")
+          .eq("jurusan_id", jurusanId)
+          .neq("status", "draft");
+
+        const list = siswaList ?? [];
+        const total = list.length;
+        const diterima = list.filter((s) => s.status === "diterima").length;
+        const ditolak = list.filter((s) => s.status === "ditolak").length;
+        const menunggu = list.filter(
+          (s) => s.status === "menunggu" || s.status === "submitted"
+        ).length;
+
+        const nilaiArr = list
+          .map((s) => s.nilai_rata_rata)
+          .filter((n): n is number => n != null && !Number.isNaN(Number(n)))
+          .map(Number);
+        const avgNilai =
+          nilaiArr.length > 0
+            ? nilaiArr.reduce((a, b) => a + b, 0) / nilaiArr.length
+            : null;
+
+        const trendMap: Record<string, number> = {};
+        const today = new Date();
+        for (let i = 6; i >= 0; i--) {
+          const d = new Date(today);
+          d.setDate(d.getDate() - i);
+          trendMap[d.toISOString().split("T")[0]] = 0;
+        }
+        list.forEach((s) => {
+          if (!s.submitted_at) return;
+          const key = s.submitted_at.split("T")[0];
+          if (trendMap[key] !== undefined) trendMap[key]++;
+        });
+        const trend7: TrendData[] = Object.entries(trendMap).map(
+          ([date, jumlah]) => ({
+            hari: HARI[new Date(date).getDay()],
+            jumlah,
+          })
+        );
+
+        setJurusanDetails((prev) => ({
+          ...prev,
+          [jurusanId]: {
+            total,
+            diterima,
+            ditolak,
+            menunggu,
+            avgNilai,
+            trend7,
+          },
+        }));
+      } finally {
+        setLoadingDetailId(null);
+      }
+    },
+    [supabase]
+  );
+
+  const toggleJurusanExpand = useCallback(
+    (jurusanId: string) => {
+      if (expandedJurusan === jurusanId) {
+        setExpandedJurusan(null);
+        return;
+      }
+      setExpandedJurusan(jurusanId);
+      if (!jurusanDetails[jurusanId]) {
+        fetchJurusanDetail(jurusanId);
+      }
+    },
+    [expandedJurusan, jurusanDetails, fetchJurusanDetail]
+  );
+
+  async function exportExcel(jurusanId?: string) {
     setExporting(true);
     try {
-      const { data: siswaList } = await supabase
+      let query = supabase
         .from("siswa")
         .select(`
           nama_lengkap, nisn, nik, asal_sekolah,
           nilai_rata_rata, status, submitted_at, verified_at,
-          catatan_verifikasi,
+          catatan_verifikasi, jurusan_id,
           jurusan (kode, nama),
           ortu (nama_ayah, nama_ibu, no_ortu)
         `)
         .neq("status", "draft")
         .order("submitted_at", { ascending: false });
+
+      if (jurusanId) {
+        query = query.eq("jurusan_id", jurusanId);
+      }
+
+      const { data: siswaList } = await query;
 
       if (!siswaList || siswaList.length === 0) {
         showToast("Tidak ada data untuk diekspor", "error");
@@ -222,7 +321,13 @@ export default function LaporanPage() {
       XLSX.utils.book_append_sheet(wb, ws, "Data Pendaftar");
 
       const tanggal = new Date().toLocaleDateString("id-ID").replace(/\//g, "-");
-      XLSX.writeFile(wb, `SPMB-SMK-Citra-Negara-${tanggal}.xlsx`);
+      const jurusanKode = jurusanId
+        ? rekap.find((j) => j.id === jurusanId)?.kode ?? "jurusan"
+        : null;
+      const fileName = jurusanKode
+        ? `SPMB-${jurusanKode}-${tanggal}.xlsx`
+        : `SPMB-SMK-Citra-Negara-${tanggal}.xlsx`;
+      XLSX.writeFile(wb, fileName);
     } catch {
       showToast("Gagal mengekspor data.", "error");
     } finally {
@@ -419,8 +524,249 @@ export default function LaporanPage() {
           border-bottom: none;
         }
 
-        .rekap-table tbody tr:hover td {
+        .rekap-table tbody tr.rekap-row-jurusan:hover td {
           background: #F9FAFB;
+        }
+
+        .rekap-row-jurusan {
+          cursor: pointer;
+        }
+
+        .rekap-chevron-cell {
+          width: 40px;
+          padding-left: 16px !important;
+          padding-right: 8px !important;
+        }
+
+        .rekap-chevron {
+          color: #9CA3AF;
+          transition: transform 0.2s ease;
+          flex-shrink: 0;
+        }
+
+        .rekap-chevron.expanded {
+          transform: rotate(90deg);
+        }
+
+        .expanded-detail-cell {
+          padding: 0 !important;
+          border-bottom: 1px solid #E5E7EB !important;
+          vertical-align: top;
+        }
+
+        .expanded-detail-wrap {
+          background: #F9FAFB;
+          border-top: 1px solid #E5E7EB;
+          border-bottom: 1px solid #E5E7EB;
+          padding: 20px 24px;
+          animation: fadeUp 0.3s ease;
+        }
+
+        .expanded-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 24px;
+        }
+
+        .mini-stats {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+
+        .mini-stat-value {
+          font-family: 'Bricolage Grotesque', sans-serif;
+          font-size: 20px;
+          font-weight: 700;
+          color: #0C0C0C;
+          line-height: 1.2;
+        }
+
+        .mini-stat-value.red {
+          color: #DC2626;
+        }
+
+        .mini-stat-label {
+          font-size: 11px;
+          color: #6B7280;
+          margin-top: 2px;
+        }
+
+        .progress-visual {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+
+        .progress-visual-label {
+          font-size: 12px;
+          font-weight: 600;
+          color: #374151;
+          margin-bottom: 6px;
+        }
+
+        .progress-bar-lg-track {
+          height: 12px;
+          background: #E5E7EB;
+          border-radius: 9999px;
+          overflow: hidden;
+        }
+
+        .progress-bar-lg-fill {
+          height: 100%;
+          background: #1C5C38;
+          border-radius: 9999px;
+          transition: width 0.4s ease;
+        }
+
+        .progress-bar-lg-fill.light {
+          background: #86EFAC;
+        }
+
+        .progress-visual-meta {
+          font-size: 11px;
+          color: #6B7280;
+          margin-top: 4px;
+        }
+
+        .avg-nilai-block {
+          padding-top: 4px;
+        }
+
+        .avg-nilai-value {
+          font-family: 'Bricolage Grotesque', sans-serif;
+          font-size: 20px;
+          font-weight: 700;
+          color: #0C0C0C;
+        }
+
+        .mini-chart-title {
+          font-size: 12px;
+          font-weight: 600;
+          color: #374151;
+          margin-bottom: 8px;
+        }
+
+        .mini-chart-wrap {
+          height: 120px;
+          width: 100%;
+        }
+
+        .detail-skeleton-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 24px;
+        }
+
+        .detail-skeleton-col {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .skeleton-line {
+          height: 14px;
+          border-radius: 6px;
+          background: linear-gradient(90deg, #E5E7EB 25%, #F3F4F6 50%, #E5E7EB 75%);
+          background-size: 200% 100%;
+          animation: shimmer 1.2s infinite;
+        }
+
+        .skeleton-line.tall {
+          height: 48px;
+        }
+
+        .skeleton-line.chart {
+          height: 120px;
+        }
+
+        .expanded-empty {
+          text-align: center;
+          padding: 24px 0;
+        }
+
+        .expanded-empty p {
+          font-size: 14px;
+          color: #6B7280;
+          margin-bottom: 12px;
+        }
+
+        .expanded-empty-link {
+          font-size: 13px;
+          font-weight: 600;
+          color: #1C5C38;
+          text-decoration: none;
+        }
+
+        .expanded-empty-link:hover {
+          text-decoration: underline;
+        }
+
+        .detail-actions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 10px;
+          margin-top: 20px;
+          padding-top: 16px;
+          border-top: 1px solid #E5E7EB;
+        }
+
+        .detail-action-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 8px 14px;
+          font-size: 13px;
+          font-weight: 600;
+          font-family: inherit;
+          border-radius: 8px;
+          cursor: pointer;
+          text-decoration: none;
+          transition: background 0.15s, border-color 0.15s;
+        }
+
+        .detail-action-btn.primary {
+          background: #1C5C38;
+          color: #fff;
+          border: 1px solid #1C5C38;
+        }
+
+        .detail-action-btn.primary:hover:not(:disabled) {
+          background: #2A7A4E;
+        }
+
+        .detail-action-btn.secondary {
+          background: #fff;
+          color: #374151;
+          border: 1px solid #E5E7EB;
+        }
+
+        .detail-action-btn.secondary:hover:not(:disabled) {
+          background: #F9FAFB;
+        }
+
+        .detail-action-btn.ghost {
+          background: transparent;
+          color: #6B7280;
+          border: 1px solid transparent;
+        }
+
+        .detail-action-btn.ghost:hover {
+          color: #374151;
+          background: #fff;
+          border-color: #E5E7EB;
+        }
+
+        .detail-action-btn:disabled {
+          opacity: 0.7;
+          cursor: not-allowed;
+        }
+
+        @media (max-width: 900px) {
+          .expanded-grid,
+          .detail-skeleton-grid {
+            grid-template-columns: 1fr;
+          }
         }
 
         .jurusan-kode {
@@ -662,7 +1008,7 @@ export default function LaporanPage() {
           <button
             type="button"
             className="export-btn no-print"
-            onClick={exportExcel}
+            onClick={() => exportExcel()}
             disabled={exporting}
           >
             <FileSpreadsheet size={18} />
@@ -714,6 +1060,7 @@ export default function LaporanPage() {
               <table className="rekap-table">
                 <thead>
                   <tr>
+                    <th className="rekap-chevron-cell" aria-label="Expand" />
                     <th>Jurusan</th>
                     <th>Total Pendaftar</th>
                     <th>Diterima</th>
@@ -725,7 +1072,7 @@ export default function LaporanPage() {
                   {rekap.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={5}
+                        colSpan={6}
                         style={{
                           textAlign: "center",
                           color: "#9CA3AF",
@@ -736,40 +1083,290 @@ export default function LaporanPage() {
                       </td>
                     </tr>
                   ) : (
-                    rekap.map((j) => (
-                      <tr key={j.id}>
-                        <td>
-                          <span className="jurusan-kode">{j.kode}</span>
-                          {j.nama}
-                        </td>
-                        <td style={{ fontWeight: 600 }}>{j.total}</td>
-                        <td style={{ color: "#1C5C38", fontWeight: 600 }}>
-                          {j.diterima}
-                        </td>
-                        <td>
-                          <div className="progress-wrap">
-                            <div className="progress-track">
-                              <div
-                                className="progress-fill"
-                                style={{
-                                  width: `${Math.min(j.persen, 100)}%`,
-                                }}
+                    rekap.map((j) => {
+                      const isExpanded = expandedJurusan === j.id;
+                      const detail = jurusanDetails[j.id];
+                      const isLoadingDetail =
+                        isExpanded &&
+                        loadingDetailId === j.id &&
+                        !detail;
+                      const kuotaPct =
+                        j.kuota > 0
+                          ? Math.min(Math.round((j.diterima / j.kuota) * 100), 100)
+                          : 0;
+                      const kelulusanPct =
+                        detail && detail.total > 0
+                          ? Math.round((detail.diterima / detail.total) * 100)
+                          : j.total > 0
+                            ? Math.round((j.diterima / j.total) * 100)
+                            : 0;
+
+                      return (
+                        <Fragment key={j.id}>
+                          <tr
+                            className="rekap-row-jurusan"
+                            onClick={() => toggleJurusanExpand(j.id)}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                toggleJurusanExpand(j.id);
+                              }
+                            }}
+                            aria-expanded={isExpanded}
+                          >
+                            <td className="rekap-chevron-cell">
+                              <ChevronRight
+                                size={18}
+                                className={`rekap-chevron${isExpanded ? " expanded" : ""}`}
+                                aria-hidden
                               />
-                            </div>
-                            <span className="progress-pct">{j.persen}%</span>
-                          </div>
-                          <div className="progress-meta">
-                            {j.diterima} / {j.kuota} kuota
-                          </div>
-                        </td>
-                        <td>
-                          <span className="status-aktif">
-                            <span className="dot-aktif" aria-hidden="true" />
-                            Aktif
-                          </span>
-                        </td>
-                      </tr>
-                    ))
+                            </td>
+                            <td>
+                              <span className="jurusan-kode">{j.kode}</span>
+                              {j.nama}
+                            </td>
+                            <td style={{ fontWeight: 600 }}>{j.total}</td>
+                            <td style={{ color: "#1C5C38", fontWeight: 600 }}>
+                              {j.diterima}
+                            </td>
+                            <td>
+                              <div className="progress-wrap">
+                                <div className="progress-track">
+                                  <div
+                                    className="progress-fill"
+                                    style={{
+                                      width: `${Math.min(j.persen, 100)}%`,
+                                    }}
+                                  />
+                                </div>
+                                <span className="progress-pct">{j.persen}%</span>
+                              </div>
+                              <div className="progress-meta">
+                                {j.diterima} / {j.kuota} kuota
+                              </div>
+                            </td>
+                            <td>
+                              <span className="status-aktif">
+                                <span className="dot-aktif" aria-hidden="true" />
+                                Aktif
+                              </span>
+                            </td>
+                          </tr>
+                          {isExpanded && (
+                            <tr className="no-print">
+                              <td colSpan={6} className="expanded-detail-cell">
+                                <div className="expanded-detail-wrap">
+                                  {isLoadingDetail ? (
+                                    <div className="detail-skeleton-grid">
+                                      <div className="detail-skeleton-col">
+                                        <div className="skeleton-line" />
+                                        <div className="skeleton-line" />
+                                        <div className="skeleton-line" />
+                                        <div className="skeleton-line" />
+                                      </div>
+                                      <div className="detail-skeleton-col">
+                                        <div className="skeleton-line tall" />
+                                        <div className="skeleton-line tall" />
+                                        <div className="skeleton-line" />
+                                      </div>
+                                      <div className="detail-skeleton-col">
+                                        <div className="skeleton-line chart" />
+                                      </div>
+                                    </div>
+                                  ) : detail && detail.total === 0 ? (
+                                    <div className="expanded-empty">
+                                      <p>
+                                        Belum ada pendaftar untuk jurusan ini.
+                                      </p>
+                                      <Link
+                                        href="/dashboard/users"
+                                        className="expanded-empty-link"
+                                      >
+                                        Lihat di Manajemen Pendaftar →
+                                      </Link>
+                                    </div>
+                                  ) : detail ? (
+                                    <>
+                                      <div className="expanded-grid">
+                                        <div className="mini-stats">
+                                          <div>
+                                            <div className="mini-stat-value">
+                                              {detail.total.toLocaleString(
+                                                "id-ID"
+                                              )}
+                                            </div>
+                                            <div className="mini-stat-label">
+                                              Total Pendaftar
+                                            </div>
+                                          </div>
+                                          <div>
+                                            <div className="mini-stat-value">
+                                              {detail.diterima.toLocaleString(
+                                                "id-ID"
+                                              )}
+                                            </div>
+                                            <div className="mini-stat-label">
+                                              Diterima
+                                            </div>
+                                          </div>
+                                          <div>
+                                            <div className="mini-stat-value red">
+                                              {detail.ditolak.toLocaleString(
+                                                "id-ID"
+                                              )}
+                                            </div>
+                                            <div className="mini-stat-label">
+                                              Ditolak
+                                            </div>
+                                          </div>
+                                          <div>
+                                            <div className="mini-stat-value">
+                                              {detail.menunggu.toLocaleString(
+                                                "id-ID"
+                                              )}
+                                            </div>
+                                            <div className="mini-stat-label">
+                                              Menunggu
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        <div className="progress-visual">
+                                          <div>
+                                            <div className="progress-visual-label">
+                                              Kuota terisi
+                                            </div>
+                                            <div className="progress-bar-lg-track">
+                                              <div
+                                                className="progress-bar-lg-fill"
+                                                style={{ width: `${kuotaPct}%` }}
+                                              />
+                                            </div>
+                                            <div className="progress-visual-meta">
+                                              {j.diterima} dari {j.kuota} kuota
+                                              terisi
+                                            </div>
+                                          </div>
+                                          <div>
+                                            <div className="progress-visual-label">
+                                              Persentase kelulusan
+                                            </div>
+                                            <div className="progress-bar-lg-track">
+                                              <div
+                                                className="progress-bar-lg-fill light"
+                                                style={{
+                                                  width: `${kelulusanPct}%`,
+                                                }}
+                                              />
+                                            </div>
+                                            <div className="progress-visual-meta">
+                                              {kelulusanPct}% diterima dari
+                                              total pendaftar
+                                            </div>
+                                          </div>
+                                          <div className="avg-nilai-block">
+                                            <div className="avg-nilai-value">
+                                              {detail.avgNilai != null
+                                                ? detail.avgNilai.toFixed(2)
+                                                : "—"}
+                                            </div>
+                                            <div className="mini-stat-label">
+                                              rata-rata nilai
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        <div>
+                                          <div className="mini-chart-title">
+                                            Tren 7 Hari Terakhir
+                                          </div>
+                                          <div className="mini-chart-wrap">
+                                            <ResponsiveContainer
+                                              width="100%"
+                                              height={120}
+                                            >
+                                              <BarChart
+                                                data={detail.trend7}
+                                                barSize={20}
+                                              >
+                                                <XAxis
+                                                  dataKey="hari"
+                                                  axisLine={false}
+                                                  tickLine={false}
+                                                  tick={{
+                                                    fontSize: 10,
+                                                    fill: "#6B7280",
+                                                  }}
+                                                />
+                                                <Tooltip
+                                                  cursor={{
+                                                    fill: "#EBF4EE",
+                                                  }}
+                                                  contentStyle={{
+                                                    border:
+                                                      "1px solid #E5E7EB",
+                                                    borderRadius: "8px",
+                                                    fontSize: "11px",
+                                                  }}
+                                                  formatter={(v: unknown) => [
+                                                    `${v} pendaftar`,
+                                                    "",
+                                                  ]}
+                                                />
+                                                <Bar
+                                                  dataKey="jumlah"
+                                                  fill="#1C5C38"
+                                                  radius={[4, 4, 0, 0]}
+                                                />
+                                              </BarChart>
+                                            </ResponsiveContainer>
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      <div className="detail-actions">
+                                        <Link
+                                          href={`/dashboard/users?jurusan=${encodeURIComponent(j.kode)}`}
+                                          className="detail-action-btn primary"
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          Lihat Semua Pendaftar
+                                        </Link>
+                                        <button
+                                          type="button"
+                                          className="detail-action-btn secondary"
+                                          disabled={exporting}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            exportExcel(j.id);
+                                          }}
+                                        >
+                                          {exporting
+                                            ? "Mengekspor..."
+                                            : "Export Data Jurusan"}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className="detail-action-btn ghost"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setExpandedJurusan(null);
+                                          }}
+                                        >
+                                          Tutup
+                                        </button>
+                                      </div>
+                                    </>
+                                  ) : null}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
