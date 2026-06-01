@@ -9,9 +9,10 @@
 
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { Printer } from "lucide-react";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { FileSpreadsheet } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import * as XLSX from "xlsx";
 import {
   BarChart,
   Bar,
@@ -64,7 +65,14 @@ export default function LaporanPage() {
   const [rekap, setRekap] = useState<RekapJurusan[]>([]);
   const [trend, setTrend] = useState<TrendData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
+  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
   const [pengaturan, setPengaturan] = useState<Record<string, string>>({});
+
+  const showToast = useCallback((msg: string, type: "success" | "error") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3500);
+  }, []);
 
   useEffect(() => {
     async function fetchAll() {
@@ -156,6 +164,72 @@ export default function LaporanPage() {
     return hari > 0 ? hari : 0;
   }
 
+  async function exportExcel() {
+    setExporting(true);
+    try {
+      const { data: siswaList } = await supabase
+        .from("siswa")
+        .select(`
+          nama_lengkap, nisn, nik, asal_sekolah,
+          nilai_rata_rata, status, submitted_at, verified_at,
+          catatan_verifikasi,
+          jurusan (kode, nama),
+          ortu (nama_ayah, nama_ibu, no_ortu)
+        `)
+        .neq("status", "draft")
+        .order("submitted_at", { ascending: false });
+
+      if (!siswaList || siswaList.length === 0) {
+        showToast("Tidak ada data untuk diekspor", "error");
+        return;
+      }
+
+      const rows = siswaList.map((s, i) => {
+        const jurusan = Array.isArray(s.jurusan) ? s.jurusan[0] : s.jurusan;
+        const ortu = Array.isArray(s.ortu) ? s.ortu[0] : s.ortu;
+
+        return {
+          No: i + 1,
+          "Nama Lengkap": s.nama_lengkap,
+          NISN: s.nisn,
+          NIK: s.nik,
+          "Asal Sekolah": s.asal_sekolah,
+          Jurusan: jurusan?.nama,
+          "Kode Jurusan": jurusan?.kode,
+          "Nilai Rata-rata": s.nilai_rata_rata,
+          Status: s.status,
+          "Tanggal Daftar": s.submitted_at
+            ? new Date(s.submitted_at).toLocaleDateString("id-ID")
+            : "-",
+          "Tanggal Verifikasi": s.verified_at
+            ? new Date(s.verified_at).toLocaleDateString("id-ID")
+            : "-",
+          "Nama Ayah": ortu?.nama_ayah,
+          "Nama Ibu": ortu?.nama_ibu,
+          "No WA Ortu": ortu?.no_ortu,
+          Catatan: s.catatan_verifikasi ?? "-",
+        };
+      });
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+
+      const colWidths = Object.keys(rows[0]).map((key) => ({
+        wch: Math.max(key.length, 15),
+      }));
+      ws["!cols"] = colWidths;
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Data Pendaftar");
+
+      const tanggal = new Date().toLocaleDateString("id-ID").replace(/\//g, "-");
+      XLSX.writeFile(wb, `SPMB-SMK-Citra-Negara-${tanggal}.xlsx`);
+    } catch {
+      showToast("Gagal mengekspor data.", "error");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   const maxTrend = useMemo(
     () => Math.max(...trend.map((t) => t.jumlah), 0),
     [trend]
@@ -217,9 +291,39 @@ export default function LaporanPage() {
           transition: background 0.15s, transform 0.15s;
         }
 
-        .export-btn:hover {
+        .export-btn:hover:not(:disabled) {
           background: #2A7A4E;
           transform: translateY(-1px);
+        }
+
+        .export-btn:disabled {
+          opacity: 0.7;
+          cursor: not-allowed;
+          transform: none;
+        }
+
+        .toast {
+          position: fixed;
+          bottom: 24px;
+          right: 24px;
+          z-index: 200;
+          padding: 12px 18px;
+          border-radius: 8px;
+          font-size: 13px;
+          font-weight: 500;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+        }
+
+        .toast.success {
+          background: #D1FAE5;
+          color: #065F46;
+          border: 1px solid #A7F3D0;
+        }
+
+        .toast.error {
+          background: #FEE2E2;
+          color: #991B1B;
+          border: 1px solid #FECACA;
         }
 
         .stats-wrapper {
@@ -558,10 +662,11 @@ export default function LaporanPage() {
           <button
             type="button"
             className="export-btn no-print"
-            onClick={() => window.print()}
+            onClick={exportExcel}
+            disabled={exporting}
           >
-            <Printer size={18} />
-            Export PDF
+            <FileSpreadsheet size={18} />
+            {exporting ? "Mengekspor..." : "Export Excel"}
           </button>
         </div>
 
@@ -754,6 +859,8 @@ export default function LaporanPage() {
           </>
         )}
       </div>
+
+      {toast && <div className={`toast ${toast.type}`}>{toast.msg}</div>}
     </>
   );
 }
