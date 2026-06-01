@@ -22,6 +22,51 @@ import LandingNavbar from "@/components/landing/navbar";
 import StatsBlock from "@/components/landing/stats-block";
 import HeroCountdown from "@/components/landing/hero-countdown";
 
+const JURUSAN_LIST = [
+  {
+    kode: "PPLG",
+    nama: "Rekayasa Perangkat Lunak",
+    desc: "Belajar pengembangan aplikasi web, mobile, dan sistem perangkat lunak dengan stack industri terkini.",
+    img: "https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=600&h=340&fit=crop&q=80",
+    delay: "",
+  },
+  {
+    kode: "TKJ",
+    nama: "Teknik Komputer & Jaringan",
+    desc: "Kuasai infrastruktur jaringan, keamanan siber, dan administrasi sistem. Siap kerja di bidang IT support dan network engineering.",
+    img: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&h=340&fit=crop&q=80",
+    delay: "reveal-delay-1",
+  },
+  {
+    kode: "MPC",
+    nama: "Multimedia & Produksi Konten",
+    desc: "Kuasai videografi, fotografi, editing, dan strategi konten digital untuk industri kreatif.",
+    img: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=600&h=340&fit=crop&q=80",
+    delay: "reveal-delay-2",
+  },
+  {
+    kode: "DKV",
+    nama: "Desain Komunikasi Visual",
+    desc: "Kembangkan skill desain grafis, video production, dan konten kreatif untuk media digital.",
+    img: "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=600&h=340&fit=crop&q=80",
+    delay: "reveal-delay-3",
+  },
+  {
+    kode: "MPLB",
+    nama: "Manajemen & Layanan Bisnis",
+    desc: "Administrasi profesional, manajemen dokumen digital, dan layanan pelanggan standar industri.",
+    img: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&h=340&fit=crop&q=80",
+    delay: "reveal-delay-1",
+  },
+  {
+    kode: "PHW",
+    nama: "Perhotelan & Pariwisata",
+    desc: "Siap berkarier di industri hospitality dengan pelatihan layanan hotel, front office, dan pariwisata.",
+    img: "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600&h=340&fit=crop&q=80",
+    delay: "reveal-delay-2",
+  },
+];
+
 export default function LandingPage() {
   useEffect(() => {
     // Scroll reveal
@@ -311,7 +356,8 @@ export default function LandingPage() {
         }
         .jurusan-name { font-family:'Bricolage Grotesque',sans-serif;font-size:1.4rem;font-weight:700;letter-spacing:-0.02em;margin-bottom:8px; }
         .jurusan-desc { font-size:0.9rem;color:var(--muted);line-height:1.6;max-width:500px; }
-        .jurusan-arrow { margin-top:16px;display:inline-flex;align-items:center;gap:6px;font-size:0.82rem;font-weight:600;color:var(--accent); }
+        .jurusan-arrow { margin-top:16px;display:inline-flex;align-items:center;gap:6px;font-size:0.82rem;font-weight:600;color:var(--accent);text-decoration:none; }
+        .jurusan-arrow:hover { text-decoration:underline; }
 
         /* ===== ALUR ===== */
         .alur { padding: 120px 0; background: var(--bg); }
@@ -709,50 +755,7 @@ export default function LandingPage() {
           </div>
 
           <div>
-            {[
-              {
-                kode: "PPLG",
-                nama: "Rekayasa Perangkat Lunak",
-                desc: "Belajar pengembangan aplikasi web, mobile, dan sistem perangkat lunak dengan stack industri terkini.",
-                img: "https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=600&h=340&fit=crop&q=80",
-                delay: "",
-              },
-              {
-                kode: "TKJ",
-                nama: "Teknik Komputer & Jaringan",
-                desc: "Kuasai infrastruktur jaringan, keamanan siber, dan administrasi sistem. Siap kerja di bidang IT support dan network engineering.",
-                img: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&h=340&fit=crop&q=80",
-                delay: "reveal-delay-1",
-              },
-              {
-                kode: "PM",
-                nama: "Pemasaran dan Marketing",
-                desc: "Pelajari strategi pemasaran digital, branding, dan komunikasi bisnis untuk dunia industri modern.",
-                img: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=600&h=340&fit=crop&q=80",
-                delay: "reveal-delay-2",
-              },
-              {
-                kode: "DKV",
-                nama: "Multimedia & Produksi Konten",
-                desc: "Kembangkan skill desain grafis, video production, dan konten kreatif untuk media digital.",
-                img: "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=600&h=340&fit=crop&q=80",
-                delay: "reveal-delay-3",
-              },
-              {
-                kode: "MPLB",
-                nama: "Manajemen & Layanan Bisnis",
-                desc: "Administrasi profesional, manajemen dokumen digital, dan layanan pelanggan standar industri.",
-                img: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&h=340&fit=crop&q=80",
-                delay: "reveal-delay-1",
-              },
-              {
-                kode: "PH",
-                nama: "Perhotelan & Pariwisata",
-                desc: "Siap berkarier di industri hospitality dengan pelatihan layanan hotel, front office, dan pariwisata.",
-                img: "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600&h=340&fit=crop&q=80",
-                delay: "reveal-delay-2",
-              },
-            ].map((j) => (
+            {JURUSAN_LIST.map((j) => (
               <div className={`jurusan-item reveal ${j.delay}`} key={j.kode}>
                 <div className="jurusan-img-wrap">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -762,7 +765,9 @@ export default function LandingPage() {
                 <div className="jurusan-info">
                   <div className="jurusan-name">{j.nama}</div>
                   <div className="jurusan-desc">{j.desc}</div>
-                  <div className="jurusan-arrow">Selengkapnya →</div>
+                  <Link href={`/jurusan/${j.kode}`} className="jurusan-arrow">
+                    Selengkapnya →
+                  </Link>
                 </div>
               </div>
             ))}

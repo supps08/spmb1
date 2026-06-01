@@ -11,6 +11,7 @@ const PUBLIC_PATHS = [
   "/",
   "/login",
   "/register",
+  "/jurusan",
   "/hasil-seleksi",
   "/api/auth/login",
   "/api/auth/register",
