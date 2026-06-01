@@ -21,6 +21,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { useScrollAnimation } from "@/lib/useScrollAnimation";
 import LandingFooter from "@/components/landing/footer";
+import LandingNavbar from "@/components/landing/navbar";
 
 interface HasilSeleksi {
   nama_lengkap: string;
@@ -189,65 +190,10 @@ export default function HasilSeleksiPage() {
           min-height: 100vh;
         }
 
-        .hs-nav {
-          background: var(--white);
-          border-bottom: 1px solid var(--border);
-          height: 60px;
-          display: flex;
-          align-items: center;
-          position: sticky;
-          top: 0;
-          z-index: 50;
-        }
-
-        .hs-nav-inner {
-          max-width: 720px;
-          margin: 0 auto;
-          padding: 0 24px;
-          width: 100%;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-        }
-
-        .hs-logo {
-          font-family: 'Bricolage Grotesque', sans-serif;
-          font-weight: 800;
-          font-size: 1rem;
-          color: var(--ink);
-          text-decoration: none;
-          letter-spacing: -0.02em;
-        }
-
-        .hs-logo span { color: var(--accent); }
-
-        .hs-nav-links {
-          display: flex;
-          gap: 24px;
-          list-style: none;
-        }
-
-        .hs-nav-links a {
-          font-size: 14px;
-          font-weight: 500;
-          color: var(--muted);
-          text-decoration: none;
-          transition: color 0.2s;
-          padding-bottom: 2px;
-        }
-
-        .hs-nav-links a:hover { color: var(--ink); }
-
-        .hs-nav-links a.active {
-          color: var(--accent);
-          font-weight: 600;
-          border-bottom: 2px solid var(--accent);
-        }
-
         .hs-page {
           max-width: 720px;
           margin: 0 auto;
-          padding: 48px 24px 0;
+          padding: 116px 24px 0;
         }
 
         .hs-header {
@@ -633,30 +579,10 @@ export default function HasilSeleksiPage() {
           .search-row { flex-direction: column; }
           .detail-grid { grid-template-columns: 1fr; }
           .info-boxes { grid-template-columns: 1fr; }
-          .hs-nav-links { display: none; }
         }
       `}</style>
 
-      <nav className="hs-nav">
-        <div className="hs-nav-inner">
-          <Link href="/" className="hs-logo">
-            SMK <span>Citra Negara</span>
-          </Link>
-          <ul className="hs-nav-links">
-            <li>
-              <Link href="/">Beranda</Link>
-            </li>
-            <li>
-              <Link href="/pendaftaran">Pendaftaran</Link>
-            </li>
-            <li>
-              <Link href="/hasil-seleksi" className="active">
-                Hasil Seleksi
-              </Link>
-            </li>
-          </ul>
-        </div>
-      </nav>
+      <LandingNavbar activePage="hasil-seleksi" />
 
       <div className="hs-page">
         <div className="hs-header" data-animate data-delay="0">

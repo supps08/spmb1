@@ -15,41 +15,15 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
 import LandingFooter from "@/components/landing/footer";
+import LandingNavbar from "@/components/landing/navbar";
 import StatsBlock from "@/components/landing/stats-block";
 import HeroCountdown from "@/components/landing/hero-countdown";
 
 export default function LandingPage() {
-  const [navUser, setNavUser] = useState<{ name: string; role: string } | null>(null);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [dropdownClosing, setDropdownClosing] = useState(false);
-
-  function closeDropdown() {
-    setDropdownClosing(true);
-    setTimeout(() => {
-      setDropdownOpen(false);
-      setDropdownClosing(false);
-    }, 180);
-  }
-
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeDropdown();
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, []);
-
-  useEffect(() => {
-    // Navbar scroll effect
-    const navbar = document.getElementById("lp-navbar");
-    const handleScroll = () => {
-      if (navbar) navbar.classList.toggle("scrolled", window.scrollY > 60);
-    };
-    window.addEventListener("scroll", handleScroll, { passive: true });
-
     // Scroll reveal
     const reveals = document.querySelectorAll(".reveal");
     const observer = new IntersectionObserver(
@@ -79,15 +53,7 @@ export default function LandingPage() {
     };
     links.forEach((a) => a.addEventListener("click", handleClick));
 
-    fetch("/api/auth/me")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data?.user) setNavUser(data.user);
-      })
-      .catch(() => {});
-
     return () => {
-      window.removeEventListener("scroll", handleScroll);
       observer.disconnect();
       links.forEach((a) => a.removeEventListener("click", handleClick));
     };
@@ -95,6 +61,8 @@ export default function LandingPage() {
 
   return (
     <>
+      <LandingNavbar activePage="beranda" />
+
       <style>{`
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -208,40 +176,10 @@ export default function LandingPage() {
         .reveal-delay-2 { transition-delay: 0.2s; }
         .reveal-delay-3 { transition-delay: 0.3s; }
 
-        /* ===== NAVBAR ===== */
-        nav {
-          position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
-          backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-          background: rgba(255,255,255,0.05);
-          border-bottom: 1px solid rgba(255,255,255,0.1);
-          transition: background 0.3s ease, border-color 0.3s ease;
-        }
-        nav.scrolled {
-          background: rgba(240,248,244,0.92);
-          border-bottom: 1px solid rgba(196,224,209,0.6);
-        }
-        .nav-inner {
-          display: flex; align-items: center;
-          justify-content: space-between; height: 68px; gap: 24px;
-          width: 100%;
-        }
-        .nav-logo {
-          font-family: 'Bricolage Grotesque', sans-serif;
-          font-weight: 800; font-size: 1.15rem;
-          color: var(--ink); text-decoration: none;
-          letter-spacing: -0.02em; flex-shrink: 0;
-        }
-        .nav-logo span { color: var(--accent); }
-        .nav-links { display: flex; align-items: center; gap: 32px; list-style: none; }
-        .nav-links a {
-          font-size: 0.88rem; font-weight: 500; color: var(--muted);
-          text-decoration: none; transition: color 0.2s ease;
-        }
-        .nav-links a:hover { color: var(--ink); }
-
         /* ===== HERO ===== */
         .hero {
           padding: 140px 0 100px;
+          padding-top: calc(68px + 72px);
           display: grid; grid-template-columns: 1fr 1fr;
           gap: 60px; align-items: center; min-height: 100vh;
         }
@@ -589,7 +527,7 @@ export default function LandingPage() {
 
         /* ===== RESPONSIVE ===== */
         @media (max-width: 900px) {
-          .hero { grid-template-columns: 1fr; padding: 120px 0 60px; }
+          .hero { grid-template-columns: 1fr; padding: calc(68px + 52px) 0 60px; }
           .hero-right { height: 340px; }
           .hero-photo-1 { width:160px;height:200px; }
           .hero-photo-2 { width:130px;height:160px;left:180px; }
@@ -604,7 +542,6 @@ export default function LandingPage() {
           .stats-cards-grid { grid-template-columns: repeat(2,1fr); }
           .cta-inner { grid-template-columns: 1fr; padding: 48px; }
           .cta-deco { display: none; }
-          .nav-links { display: none; }
         }
 
         @media (max-width: 600px) {
@@ -614,200 +551,6 @@ export default function LandingPage() {
           .hero-ctas { flex-direction: column; }
         }
       `}</style>
-
-      {/* ===== NAVBAR ===== */}
-      <nav id="lp-navbar">
-        <div className="container">
-          <div className="nav-inner">
-            <a href="/" className="nav-logo">
-              SMK <span>Citra Negara</span>
-            </a>
-            <ul className="nav-links">
-              <li><a href="#jurusan">Jurusan</a></li>
-              <li><a href="#alur">Alur Daftar</a></li>
-              <li><a href="#tentang">Tentang</a></li>
-              <li><a href="#kontak">Kontak</a></li>
-            </ul>
-            {navUser ? (
-              <div style={{ position: "relative", flexShrink: 0 }}>
-                <button
-                  onClick={() => dropdownOpen ? closeDropdown() : setDropdownOpen(true)}
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: "50%",
-                    background: "#1C5C38",
-                    color: "white",
-                    border: "none",
-                    cursor: "pointer",
-                    fontSize: 15,
-                    fontWeight: 700,
-                    fontFamily: "Plus Jakarta Sans, sans-serif",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  {navUser.name.charAt(0).toUpperCase()}
-                </button>
-
-                {dropdownOpen && (
-                  <>
-                    <div
-                      onClick={() => closeDropdown()}
-                      style={{ position: "fixed", inset: 0, zIndex: 40 }}
-                    />
-                    <div
-                      style={{
-                        position: "absolute",
-                        right: 0,
-                        top: "calc(100% + 8px)",
-                        background: "white",
-                        borderRadius: 12,
-                        border: "1px solid #E5E7EB",
-                        boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-                        minWidth: 200,
-                        zIndex: 50,
-                        overflow: "hidden",
-                        animation: dropdownClosing ? "fadeDown 0.18s ease forwards" : "fadeUp 0.2s ease",
-                      }}
-                    >
-                      <div
-                        style={{
-                          padding: "12px 16px",
-                          borderBottom: "1px solid #F3F4F6",
-                          background: "#F9FAFB",
-                        }}
-                      >
-                        <div style={{ fontSize: 13, fontWeight: 600, color: "#0C0C0C" }}>
-                          {navUser.name}
-                        </div>
-                        <div style={{ fontSize: 11, color: "#6B7280", marginTop: 2 }}>
-                          {navUser.role === "admin" ? "Administrator" : "Pendaftar"}
-                        </div>
-                      </div>
-
-                      <div style={{ padding: "6px 0" }}>
-                        <a
-                          href="/hasil-seleksi"
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 10,
-                            padding: "10px 16px",
-                            fontSize: 13,
-                            color: "#374151",
-                            textDecoration: "none",
-                            transition: "background 0.15s",
-                          }}
-                          onMouseEnter={(e) => (e.currentTarget.style.background = "#F9FAFB")}
-                          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                        >
-                          🔍 Hasil Seleksi
-                        </a>
-
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 10,
-                            padding: "10px 16px",
-                            fontSize: 13,
-                            color: "#9CA3AF",
-                            cursor: "not-allowed",
-                            position: "relative",
-                          }}
-                        >
-                          <span style={{ position: "relative" }}>
-                            💳
-                            <span
-                              style={{
-                                position: "absolute",
-                                top: -4,
-                                right: -4,
-                                width: 8,
-                                height: 8,
-                                borderRadius: "50%",
-                                background: "#DC2626",
-                                border: "1.5px solid white",
-                              }}
-                            />
-                          </span>
-                          Pembayaran
-                          <span
-                            style={{
-                              marginLeft: "auto",
-                              fontSize: 10,
-                              fontWeight: 600,
-                              background: "#FEF3C7",
-                              color: "#92400E",
-                              padding: "2px 6px",
-                              borderRadius: 9999,
-                            }}
-                          >
-                            Segera
-                          </span>
-                        </div>
-
-                        <a
-                          href={navUser.role === "admin" ? "/dashboard/profile" : "/pendaftaran"}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 10,
-                            padding: "10px 16px",
-                            fontSize: 13,
-                            color: "#374151",
-                            textDecoration: "none",
-                            transition: "background 0.15s",
-                          }}
-                          onMouseEnter={(e) => (e.currentTarget.style.background = "#F9FAFB")}
-                          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                        >
-                          👤 {navUser.role === "admin" ? "Dashboard" : "Pendaftaran Saya"}
-                        </a>
-
-                        <div style={{ height: 1, background: "#F3F4F6", margin: "4px 0" }} />
-
-                        <button
-                          onClick={async () => {
-                            await fetch("/api/auth/logout", { method: "POST" });
-                            setNavUser(null);
-                            setDropdownOpen(false);
-                            window.location.href = "/login";
-                          }}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 10,
-                            padding: "10px 16px",
-                            fontSize: 13,
-                            color: "#DC2626",
-                            background: "none",
-                            border: "none",
-                            cursor: "pointer",
-                            width: "100%",
-                            textAlign: "left",
-                            transition: "background 0.15s",
-                          }}
-                          onMouseEnter={(e) => (e.currentTarget.style.background = "#FEF2F2")}
-                          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                        >
-                          🚪 Keluar
-                        </button>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-            ) : (
-              <Link href="/register" className="btn-primary" style={{ fontSize: "0.85rem", padding: "12px 22px" }}>
-                Daftar Sekarang
-              </Link>
-            )}
-          </div>
-        </div>
-      </nav>
 
       {/* ===== HERO ===== */}
       <section style={{ paddingTop: 0 }}>

@@ -5,8 +5,8 @@
 //        - Trust badges di bawah
 // ============================================================
 
-import Link from "next/link";
 import LandingFooter from "@/components/landing/footer";
+import LandingNavbar from "@/components/landing/navbar";
 
 export default function PendaftaranLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -29,41 +29,9 @@ export default function PendaftaranLayout({ children }: { children: React.ReactN
           background: var(--bg);
           color: var(--ink);
         }
-        .pend-navbar {
-          position: sticky; top: 0; z-index: 50;
-          background: var(--white);
-          border-bottom: 1px solid var(--border);
-          height: 60px;
-          display: flex; align-items: center;
-        }
-        .pend-navbar-inner {
-          max-width: 800px; margin: 0 auto; padding: 0 24px;
-          width: 100%;
-          display: flex; align-items: center; justify-content: space-between;
-        }
-        .pend-logo {
-          font-family: 'Bricolage Grotesque', sans-serif;
-          font-weight: 800; font-size: 1rem;
-          color: var(--ink); text-decoration: none;
-          letter-spacing: -0.02em;
-        }
-        .pend-logo span { color: var(--accent); }
-        .pend-nav-links {
-          display: flex; align-items: center; gap: 24px; list-style: none;
-        }
-        .pend-nav-links a {
-          font-size: 0.85rem; font-weight: 500; color: var(--muted);
-          text-decoration: none; transition: color .2s;
-        }
-        .pend-nav-links a:hover { color: var(--ink); }
-        .pend-nav-links a.active {
-          color: var(--accent); font-weight: 600;
-          border-bottom: 2px solid var(--accent); padding-bottom: 2px;
-        }
-
         .pend-main {
           max-width: 800px; margin: 0 auto;
-          padding: 40px 24px 80px;
+          padding: 108px 24px 80px;
         }
 
         .pend-page-header {
@@ -106,23 +74,10 @@ export default function PendaftaranLayout({ children }: { children: React.ReactN
 
         @media (max-width: 600px) {
           .trust-badges { grid-template-columns: 1fr; }
-          .pend-nav-links { display: none; }
         }
       `}</style>
 
-      {/* Navbar */}
-      <nav className="pend-navbar">
-        <div className="pend-navbar-inner">
-          <Link href="/" className="pend-logo">
-            SMK <span>Citra Negara</span>
-          </Link>
-          <ul className="pend-nav-links">
-            <li><Link href="/">Beranda</Link></li>
-            <li><Link href="/pendaftaran" className="active">Pendaftaran</Link></li>
-            <li><Link href="/hasil-seleksi">Hasil Seleksi</Link></li>
-          </ul>
-        </div>
-      </nav>
+      <LandingNavbar activePage="pendaftaran" />
 
       {/* Content */}
       <main className="pend-main">{children}</main>
