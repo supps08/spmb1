@@ -9,7 +9,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Search, ChevronLeft, ChevronRight, Eye, ClipboardCheck } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Eye, ClipboardCheck, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { avatarColor } from "@/lib/avatar";
 import { useScrollAnimation } from "@/lib/useScrollAnimation";
@@ -37,6 +37,43 @@ interface Pendaftar {
   jurusan: JurusanInfo | JurusanInfo[] | null;
   profiles: ProfileInfo | ProfileInfo[] | null;
 }
+
+interface OrtuInfo {
+  nama_ayah: string | null;
+  nama_ibu: string | null;
+  pekerjaan_ayah: string | null;
+  pekerjaan_ibu: string | null;
+  no_ortu: string | null;
+}
+
+interface BerkasInfo {
+  foto_url: string | null;
+  ijazah_url: string | null;
+  rapor_url: string | null;
+  kk_url: string | null;
+}
+
+interface SiswaDetail {
+  id: string;
+  nama_lengkap: string | null;
+  nisn: string | null;
+  nik: string | null;
+  tempat_lahir: string | null;
+  tanggal_lahir: string | null;
+  jenis_kelamin: string | null;
+  agama: string | null;
+  asal_sekolah: string | null;
+  alamat_lengkap: string | null;
+  nilai_rata_rata: number | null;
+  prestasi: string | null;
+  status: string;
+  catatan_verifikasi: string | null;
+  ortu: OrtuInfo | OrtuInfo[] | null;
+  berkas: BerkasInfo | BerkasInfo[] | null;
+}
+
+type VerifikasiStatus = "diterima" | "ditolak" | "menunggu";
+type ToastState = { type: "success" | "error"; msg: string } | null;
 
 type JurusanFilter = "all" | string;
 type StatusFilter = "all" | "menunggu" | "diterima" | "ditolak";
@@ -98,6 +135,42 @@ function matchesStatusFilter(status: string, filter: StatusFilter): boolean {
   return status === filter;
 }
 
+function resolveOrtu(ortu: SiswaDetail["ortu"]): OrtuInfo | null {
+  if (!ortu) return null;
+  if (Array.isArray(ortu)) return ortu[0] ?? null;
+  return ortu;
+}
+
+function resolveBerkas(berkas: SiswaDetail["berkas"]): BerkasInfo | null {
+  if (!berkas) return null;
+  if (Array.isArray(berkas)) return berkas[0] ?? null;
+  return berkas;
+}
+
+function toVerifikasiStatus(status: string): VerifikasiStatus {
+  if (status === "diterima" || status === "ditolak") return status;
+  return "menunggu";
+}
+
+function formatTTL(tempat: string | null, tanggal: string | null): string {
+  const t = tempat?.trim();
+  const d = tanggal
+    ? new Date(tanggal).toLocaleDateString("id-ID", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })
+    : null;
+  if (t && d) return `${t}, ${d}`;
+  return t || d || "—";
+}
+
+function formatJenisKelamin(jk: string | null): string {
+  if (jk === "L") return "Laki-laki";
+  if (jk === "P") return "Perempuan";
+  return jk || "—";
+}
+
 export default function UsersPage() {
   useScrollAnimation();
 
@@ -108,6 +181,21 @@ export default function UsersPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortBy, setSortBy] = useState<SortOption>("newest");
   const [page, setPage] = useState(1);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [activeDetailId, setActiveDetailId] = useState<string | null>(null);
+  const [detailData, setDetailData] = useState<SiswaDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailStatus, setDetailStatus] = useState<VerifikasiStatus>("menunggu");
+  const [detailCatatan, setDetailCatatan] = useState("");
+  const [quickVerifyTarget, setQuickVerifyTarget] = useState<Pendaftar | null>(null);
+  const [quickCatatan, setQuickCatatan] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState<ToastState>(null);
+
+  const showToast = useCallback((msg: string, type: "success" | "error" = "success") => {
+    setToast({ msg, type });
+    window.setTimeout(() => setToast(null), 3500);
+  }, []);
 
   const fetchPendaftar = useCallback(async () => {
     setLoading(true);
@@ -138,8 +226,111 @@ export default function UsersPage() {
   }, [fetchPendaftar]);
 
   useEffect(() => {
+    fetch("/api/auth/me")
+      .then((res) => res.json())
+      .then((data: { user?: { id: string } | null }) => {
+        if (data.user?.id) setCurrentUserId(data.user.id);
+      })
+      .catch(() => setCurrentUserId(null));
+  }, []);
+
+  useEffect(() => {
     setPage(1);
   }, [search, jurusanFilter, statusFilter, sortBy]);
+
+  const fetchSiswaDetail = useCallback(async (siswaId: string) => {
+    setDetailLoading(true);
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("siswa")
+      .select(
+        `
+        id, nama_lengkap, nisn, nik, tempat_lahir, tanggal_lahir,
+        jenis_kelamin, agama, asal_sekolah, alamat_lengkap,
+        nilai_rata_rata, prestasi, status, catatan_verifikasi,
+        ortu (nama_ayah, nama_ibu, pekerjaan_ayah, pekerjaan_ibu, no_ortu),
+        berkas (foto_url, ijazah_url, rapor_url, kk_url)
+      `
+      )
+      .eq("id", siswaId)
+      .single();
+
+    if (!error && data) {
+      const detail = data as SiswaDetail;
+      setDetailData(detail);
+      setDetailStatus(toVerifikasiStatus(detail.status));
+      setDetailCatatan(detail.catatan_verifikasi ?? "");
+    } else {
+      setDetailData(null);
+      setActiveDetailId(null);
+      showToast("Gagal memuat detail pendaftar.", "error");
+    }
+    setDetailLoading(false);
+  }, [showToast]);
+
+  const openDetailModal = useCallback(
+    (item: Pendaftar) => {
+      setActiveDetailId(item.id);
+      setDetailData(null);
+      setDetailCatatan("");
+      void fetchSiswaDetail(item.id);
+    },
+    [fetchSiswaDetail]
+  );
+
+  const closeDetailModal = useCallback(() => {
+    setActiveDetailId(null);
+    setDetailData(null);
+    setDetailLoading(false);
+  }, []);
+
+  const updateVerifikasi = useCallback(
+    async (siswaId: string, newStatus: VerifikasiStatus, catatan: string) => {
+      if (!currentUserId) {
+        showToast("Sesi tidak valid. Silakan login ulang.", "error");
+        return false;
+      }
+      setSaving(true);
+      const supabase = createClient();
+      const { error } = await supabase
+        .from("siswa")
+        .update({
+          status: newStatus,
+          verified_at: new Date().toISOString(),
+          verified_by: currentUserId,
+          catatan_verifikasi: catatan.trim() || null,
+        })
+        .eq("id", siswaId);
+
+      setSaving(false);
+      if (error) {
+        showToast("Gagal menyimpan keputusan verifikasi.", "error");
+        return false;
+      }
+      await fetchPendaftar();
+      showToast("Keputusan verifikasi berhasil disimpan.");
+      return true;
+    },
+    [currentUserId, fetchPendaftar, showToast]
+  );
+
+  const handleDetailSave = useCallback(async () => {
+    if (!detailData) return;
+    const ok = await updateVerifikasi(detailData.id, detailStatus, detailCatatan);
+    if (ok) closeDetailModal();
+  }, [detailData, detailStatus, detailCatatan, updateVerifikasi, closeDetailModal]);
+
+  const handleQuickVerify = useCallback(
+    async (newStatus: "diterima" | "ditolak") => {
+      if (!quickVerifyTarget) return;
+      const ok = await updateVerifikasi(quickVerifyTarget.id, newStatus, quickCatatan);
+      if (ok) {
+        setQuickVerifyTarget(null);
+        setQuickCatatan("");
+      }
+    },
+    [quickVerifyTarget, quickCatatan, updateVerifikasi]
+  );
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -619,10 +810,289 @@ export default function UsersPage() {
           border-radius: 12px;
         }
 
+        .modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.5);
+          z-index: 100;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 20px;
+        }
+
+        .modal-detail {
+          background: #fff;
+          border-radius: 16px;
+          max-width: 640px;
+          width: 100%;
+          max-height: 90vh;
+          overflow-y: auto;
+          border: 1px solid #E5E7EB;
+          box-shadow: 0 24px 48px rgba(0, 0, 0, 0.12);
+        }
+
+        .modal-detail-header {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 20px 20px 16px;
+          border-bottom: 1px solid #E5E7EB;
+          position: sticky;
+          top: 0;
+          background: #fff;
+          z-index: 1;
+        }
+
+        .modal-detail-title {
+          font-size: 18px;
+          font-weight: 700;
+          color: #0C0C0C;
+          line-height: 1.3;
+        }
+
+        .modal-close {
+          width: 36px;
+          height: 36px;
+          border: 1px solid #E5E7EB;
+          border-radius: 8px;
+          background: #fff;
+          color: #6B7280;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          transition: background 0.15s, color 0.15s;
+        }
+
+        .modal-close:hover {
+          background: #F3F4F6;
+          color: #0C0C0C;
+        }
+
+        .modal-body {
+          padding: 0 20px 20px;
+        }
+
+        .modal-section {
+          padding: 16px 0;
+          border-bottom: 1px solid #F3F4F6;
+        }
+
+        .modal-section:last-of-type {
+          border-bottom: none;
+        }
+
+        .modal-section-title {
+          font-size: 12px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          color: #1C5C38;
+          margin-bottom: 12px;
+        }
+
+        .modal-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px 16px;
+        }
+
+        .modal-field label {
+          display: block;
+          font-size: 11px;
+          font-weight: 600;
+          color: #6B7280;
+          margin-bottom: 4px;
+        }
+
+        .modal-field span,
+        .modal-field a {
+          font-size: 13px;
+          color: #0C0C0C;
+          line-height: 1.4;
+          word-break: break-word;
+        }
+
+        .modal-field.full {
+          grid-column: 1 / -1;
+        }
+
+        .file-link {
+          color: #1C5C38;
+          font-weight: 600;
+          text-decoration: none;
+        }
+
+        .file-link:hover {
+          text-decoration: underline;
+        }
+
+        .file-missing {
+          color: #9CA3AF;
+          font-size: 13px;
+        }
+
+        .modal-verify {
+          padding: 16px 20px 20px;
+          background: #F9FAFB;
+          border-top: 1px solid #E5E7EB;
+        }
+
+        .modal-verify label {
+          display: block;
+          font-size: 12px;
+          font-weight: 600;
+          color: #374151;
+          margin-bottom: 6px;
+        }
+
+        .modal-verify select,
+        .modal-verify textarea,
+        .quick-verify-input {
+          width: 100%;
+          padding: 10px 12px;
+          border: 1px solid #E5E7EB;
+          border-radius: 8px;
+          font-family: 'Plus Jakarta Sans', sans-serif;
+          font-size: 13px;
+          color: #0C0C0C;
+          background: #fff;
+          outline: none;
+          margin-bottom: 12px;
+        }
+
+        .modal-verify select:focus,
+        .modal-verify textarea:focus,
+        .quick-verify-input:focus {
+          border-color: #1C5C38;
+        }
+
+        .btn-save-decision {
+          width: 100%;
+          padding: 12px 16px;
+          border: none;
+          border-radius: 8px;
+          background: #1C5C38;
+          color: #fff;
+          font-family: 'Plus Jakarta Sans', sans-serif;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background 0.15s;
+        }
+
+        .btn-save-decision:hover:not(:disabled) {
+          background: #2A7A4E;
+        }
+
+        .btn-save-decision:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        .modal-quick {
+          background: #fff;
+          border-radius: 16px;
+          max-width: 360px;
+          width: 100%;
+          padding: 24px;
+          border: 1px solid #E5E7EB;
+          box-shadow: 0 24px 48px rgba(0, 0, 0, 0.12);
+        }
+
+        .modal-quick-title {
+          font-size: 16px;
+          font-weight: 600;
+          color: #0C0C0C;
+          text-align: center;
+          margin-bottom: 20px;
+          line-height: 1.4;
+        }
+
+        .quick-actions {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          margin-bottom: 16px;
+        }
+
+        .btn-terima,
+        .btn-tolak {
+          width: 100%;
+          padding: 14px 16px;
+          border: none;
+          border-radius: 8px;
+          font-family: 'Plus Jakarta Sans', sans-serif;
+          font-size: 15px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: opacity 0.15s;
+        }
+
+        .btn-terima {
+          background: #1C5C38;
+          color: #fff;
+        }
+
+        .btn-terima:hover:not(:disabled) {
+          background: #2A7A4E;
+        }
+
+        .btn-tolak {
+          background: #DC2626;
+          color: #fff;
+        }
+
+        .btn-tolak:hover:not(:disabled) {
+          background: #B91C1C;
+        }
+
+        .btn-terima:disabled,
+        .btn-tolak:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        .modal-loading {
+          padding: 48px 20px;
+          text-align: center;
+          color: #6B7280;
+          font-size: 14px;
+        }
+
+        .toast {
+          position: fixed;
+          bottom: 28px;
+          right: 28px;
+          z-index: 200;
+          padding: 13px 18px;
+          border-radius: 8px;
+          font-size: 13px;
+          font-weight: 600;
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+          max-width: 360px;
+        }
+
+        .toast.success {
+          background: #D1FAE5;
+          color: #065F46;
+          border: 1px solid #A7F3D0;
+        }
+
+        .toast.error {
+          background: #FEE2E2;
+          color: #991B1B;
+          border: 1px solid #FECACA;
+        }
+
         @media (max-width: 640px) {
           .toolbar-row { flex-direction: column; align-items: stretch; }
           .filter-controls { flex-direction: column; align-items: stretch; }
           .control-group { justify-content: space-between; }
+          .modal-grid { grid-template-columns: 1fr; }
         }
       `}</style>
 
@@ -765,11 +1235,22 @@ export default function UsersPage() {
                     </div>
 
                     <div className="card-actions">
-                      <button type="button" className="btn-detail">
+                      <button
+                        type="button"
+                        className="btn-detail"
+                        onClick={() => openDetailModal(item)}
+                      >
                         <Eye size={15} />
                         Detail
                       </button>
-                      <button type="button" className="btn-verify">
+                      <button
+                        type="button"
+                        className="btn-verify"
+                        onClick={() => {
+                          setQuickCatatan("");
+                          setQuickVerifyTarget(item);
+                        }}
+                      >
                         <ClipboardCheck size={15} />
                         Verifikasi
                       </button>
@@ -819,6 +1300,252 @@ export default function UsersPage() {
           </>
         )}
       </div>
+
+      {activeDetailId && (
+        <div
+          className="modal-overlay"
+          role="presentation"
+          onClick={closeDetailModal}
+        >
+          <div
+            className="modal-detail"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="detail-modal-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {detailLoading || !detailData ? (
+              <div className="modal-loading">Memuat detail pendaftar...</div>
+            ) : (
+              <>
+                <div className="modal-detail-header">
+                  <div>
+                    <h2 id="detail-modal-title" className="modal-detail-title">
+                      {detailData.nama_lengkap || "—"}
+                    </h2>
+                    <span className={`status-pill ${statusBadge(detailData.status).variant}`}>
+                      {statusBadge(detailData.status).label}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="modal-close"
+                    onClick={closeDetailModal}
+                    aria-label="Tutup"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className="modal-body">
+                  {(() => {
+                    const ortu = resolveOrtu(detailData.ortu);
+                    const berkas = resolveBerkas(detailData.berkas);
+                    const berkasItems: { label: string; url: string | null }[] = [
+                      { label: "Foto", url: berkas?.foto_url ?? null },
+                      { label: "Ijazah", url: berkas?.ijazah_url ?? null },
+                      { label: "Rapor", url: berkas?.rapor_url ?? null },
+                      { label: "KK", url: berkas?.kk_url ?? null },
+                    ];
+
+                    return (
+                      <>
+                        <section className="modal-section">
+                          <h3 className="modal-section-title">Data Diri</h3>
+                          <div className="modal-grid">
+                            <div className="modal-field">
+                              <label>NISN</label>
+                              <span>{detailData.nisn || "—"}</span>
+                            </div>
+                            <div className="modal-field">
+                              <label>NIK</label>
+                              <span>{detailData.nik || "—"}</span>
+                            </div>
+                            <div className="modal-field">
+                              <label>TTL</label>
+                              <span>
+                                {formatTTL(detailData.tempat_lahir, detailData.tanggal_lahir)}
+                              </span>
+                            </div>
+                            <div className="modal-field">
+                              <label>Jenis Kelamin</label>
+                              <span>{formatJenisKelamin(detailData.jenis_kelamin)}</span>
+                            </div>
+                            <div className="modal-field">
+                              <label>Agama</label>
+                              <span>{detailData.agama || "—"}</span>
+                            </div>
+                            <div className="modal-field">
+                              <label>Asal Sekolah</label>
+                              <span>{detailData.asal_sekolah || "—"}</span>
+                            </div>
+                            <div className="modal-field full">
+                              <label>Alamat</label>
+                              <span>{detailData.alamat_lengkap || "—"}</span>
+                            </div>
+                          </div>
+                        </section>
+
+                        <section className="modal-section">
+                          <h3 className="modal-section-title">Data Akademik</h3>
+                          <div className="modal-grid">
+                            <div className="modal-field">
+                              <label>Nilai Rata-rata</label>
+                              <span>
+                                {detailData.nilai_rata_rata != null
+                                  ? detailData.nilai_rata_rata
+                                  : "—"}
+                              </span>
+                            </div>
+                            <div className="modal-field full">
+                              <label>Prestasi</label>
+                              <span>{detailData.prestasi?.trim() || "—"}</span>
+                            </div>
+                          </div>
+                        </section>
+
+                        <section className="modal-section">
+                          <h3 className="modal-section-title">Data Orang Tua</h3>
+                          <div className="modal-grid">
+                            <div className="modal-field">
+                              <label>Nama Ayah</label>
+                              <span>{ortu?.nama_ayah || "—"}</span>
+                            </div>
+                            <div className="modal-field">
+                              <label>Nama Ibu</label>
+                              <span>{ortu?.nama_ibu || "—"}</span>
+                            </div>
+                            <div className="modal-field">
+                              <label>Pekerjaan Ayah</label>
+                              <span>{ortu?.pekerjaan_ayah || "—"}</span>
+                            </div>
+                            <div className="modal-field">
+                              <label>Pekerjaan Ibu</label>
+                              <span>{ortu?.pekerjaan_ibu || "—"}</span>
+                            </div>
+                            <div className="modal-field full">
+                              <label>No WA Ortu</label>
+                              <span>{ortu?.no_ortu || "—"}</span>
+                            </div>
+                          </div>
+                        </section>
+
+                        <section className="modal-section">
+                          <h3 className="modal-section-title">Berkas</h3>
+                          <div className="modal-grid">
+                            {berkasItems.map((b) => (
+                              <div className="modal-field" key={b.label}>
+                                <label>{b.label}</label>
+                                {b.url ? (
+                                  <a
+                                    className="file-link"
+                                    href={b.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    Lihat File
+                                  </a>
+                                ) : (
+                                  <span className="file-missing">Belum upload</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </section>
+                      </>
+                    );
+                  })()}
+                </div>
+
+                <div className="modal-verify">
+                  <label htmlFor="detail-status">Status Verifikasi</label>
+                  <select
+                    id="detail-status"
+                    value={detailStatus}
+                    onChange={(e) =>
+                      setDetailStatus(e.target.value as VerifikasiStatus)
+                    }
+                    disabled={saving}
+                  >
+                    <option value="menunggu">Menunggu</option>
+                    <option value="diterima">Diterima</option>
+                    <option value="ditolak">Ditolak</option>
+                  </select>
+                  <label htmlFor="detail-catatan">Catatan</label>
+                  <textarea
+                    id="detail-catatan"
+                    rows={3}
+                    placeholder="Catatan verifikasi..."
+                    value={detailCatatan}
+                    onChange={(e) => setDetailCatatan(e.target.value)}
+                    disabled={saving}
+                  />
+                  <button
+                    type="button"
+                    className="btn-save-decision"
+                    onClick={() => void handleDetailSave()}
+                    disabled={saving}
+                  >
+                    {saving ? "Menyimpan..." : "Simpan Keputusan"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {quickVerifyTarget && (
+        <div
+          className="modal-overlay"
+          role="presentation"
+          onClick={() => {
+            if (!saving) {
+              setQuickVerifyTarget(null);
+              setQuickCatatan("");
+            }
+          }}
+        >
+          <div
+            className="modal-quick"
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="modal-quick-title">
+              Verifikasi pendaftaran {quickVerifyTarget.nama_lengkap || "—"}?
+            </p>
+            <div className="quick-actions">
+              <button
+                type="button"
+                className="btn-terima"
+                disabled={saving}
+                onClick={() => void handleQuickVerify("diterima")}
+              >
+                ✓ Terima
+              </button>
+              <button
+                type="button"
+                className="btn-tolak"
+                disabled={saving}
+                onClick={() => void handleQuickVerify("ditolak")}
+              >
+                ✗ Tolak
+              </button>
+            </div>
+            <input
+              type="text"
+              className="quick-verify-input"
+              placeholder="Catatan singkat (opsional)"
+              value={quickCatatan}
+              onChange={(e) => setQuickCatatan(e.target.value)}
+              disabled={saving}
+            />
+          </div>
+        </div>
+      )}
+
+      {toast && <div className={`toast ${toast.type}`}>{toast.msg}</div>}
     </>
   );
 }
