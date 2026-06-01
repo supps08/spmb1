@@ -1,254 +1,187 @@
 // ============================================================
 // PATH : app/dashboard/users/page.tsx
-// ISI  : Halaman manajemen pengguna — full CRUD
-//        - Search real-time
-//        - Tambah user → modal form
-//        - Edit user  → modal pre-filled
-//        - Hapus user → inline confirm card
+// ISI  : Halaman Manajemen Pendaftar
+//        - Data dari tabel siswa (non-draft)
+//        - Filter jurusan, status, sort, search
+//        - Kartu pendaftar + tombol Detail / Verifikasi
 // ============================================================
 
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import {
-  Plus,
-  Search,
-  Pencil,
-  Trash2,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Eye, ClipboardCheck } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { avatarColor } from "@/lib/avatar";
 import { useScrollAnimation } from "@/lib/useScrollAnimation";
 
-interface User {
+interface JurusanInfo {
   id: string;
-  name: string;
-  email: string;
-  role: "admin" | "user";
-  createdAt: string;
-  is_active?: boolean;
+  kode: string;
+  nama: string;
 }
 
-type ModalMode = "add" | "edit";
-type RoleFilter = "all" | "admin" | "user";
-type SortOption = "newest" | "oldest" | "az";
-
-interface FormState {
-  name: string;
-  email: string;
-  role: "admin" | "user";
-  password: string;
-  is_active: boolean;
+interface ProfileInfo {
+  email: string | null;
+  avatar_url: string | null;
 }
 
-const EMPTY_FORM: FormState = {
-  name: "",
-  email: "",
-  role: "user",
-  password: "",
-  is_active: true,
-};
+interface Pendaftar {
+  id: string;
+  nama_lengkap: string | null;
+  nisn: string | null;
+  asal_sekolah: string | null;
+  status: string;
+  submitted_at: string | null;
+  verified_at: string | null;
+  catatan_verifikasi: string | null;
+  jurusan: JurusanInfo | JurusanInfo[] | null;
+  profiles: ProfileInfo | ProfileInfo[] | null;
+}
 
+type JurusanFilter = "all" | string;
+type StatusFilter = "all" | "menunggu" | "diterima" | "ditolak";
+type SortOption = "newest" | "oldest" | "az" | "unverified";
+
+const JURUSAN_KODES = ["PPLG", "TKJ", "MPLB", "DKV", "MPC", "PH"] as const;
 const PAGE_SIZE = 20;
 const SKELETON_COUNT = 6;
+
+function getInitials(name: string | null | undefined): string {
+  if (!name?.trim()) return "?";
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
+function resolveJurusan(jurusan: Pendaftar["jurusan"]): JurusanInfo | null {
+  if (!jurusan) return null;
+  if (Array.isArray(jurusan)) return jurusan[0] ?? null;
+  return jurusan;
+}
+
+function resolveProfile(profiles: Pendaftar["profiles"]): ProfileInfo | null {
+  if (!profiles) return null;
+  if (Array.isArray(profiles)) return profiles[0] ?? null;
+  return profiles;
+}
+
+function formatTanggalDaftar(submittedAt: string | null): string {
+  if (!submittedAt) return "—";
+  return new Date(submittedAt).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function statusBadge(status: string): { label: string; variant: "menunggu" | "diterima" | "ditolak" } {
+  switch (status) {
+    case "diterima":
+      return { label: "Diterima", variant: "diterima" };
+    case "ditolak":
+      return { label: "Ditolak", variant: "ditolak" };
+    case "menunggu":
+      return { label: "Menunggu", variant: "menunggu" };
+    case "submitted":
+      return { label: "Dikirim", variant: "menunggu" };
+    default:
+      return { label: status, variant: "menunggu" };
+  }
+}
+
+function matchesStatusFilter(status: string, filter: StatusFilter): boolean {
+  if (filter === "all") return true;
+  if (filter === "menunggu") return status === "menunggu" || status === "submitted";
+  return status === filter;
+}
 
 export default function UsersPage() {
   useScrollAnimation();
 
-  const [users, setUsers] = useState<User[]>([]);
+  const [pendaftar, setPendaftar] = useState<Pendaftar[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
+  const [jurusanFilter, setJurusanFilter] = useState<JurusanFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortBy, setSortBy] = useState<SortOption>("newest");
   const [page, setPage] = useState(1);
 
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<ModalMode>("add");
-  const [editTarget, setEditTarget] = useState<User | null>(null);
-  const [form, setForm] = useState<FormState>(EMPTY_FORM);
-  const [formError, setFormError] = useState("");
-  const [formLoading, setFormLoading] = useState(false);
+  const fetchPendaftar = useCallback(async () => {
+    setLoading(true);
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("siswa")
+      .select(
+        `
+        id, nama_lengkap, nisn, asal_sekolah, status,
+        submitted_at, verified_at, catatan_verifikasi,
+        jurusan (id, kode, nama),
+        profiles (email, avatar_url)
+      `
+      )
+      .neq("status", "draft")
+      .order("submitted_at", { ascending: false });
 
-  const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-
-  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
-
-  const fetchUsers = useCallback(async () => {
-    const res = await fetch("/api/admin/users");
-    if (res.ok) {
-      const d = await res.json();
-      setUsers(
-        (d.users ?? []).map((u: User) => ({
-          ...u,
-          is_active: u.is_active ?? true,
-        }))
-      );
+    if (!error && data) {
+      setPendaftar(data as Pendaftar[]);
+    } else {
+      setPendaftar([]);
     }
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    fetchUsers();
-  }, [fetchUsers]);
+    fetchPendaftar();
+  }, [fetchPendaftar]);
 
   useEffect(() => {
     setPage(1);
-  }, [search, roleFilter, sortBy]);
-
-  function showToast(msg: string, type: "success" | "error") {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 3000);
-  }
-
-  function openAdd() {
-    setModalMode("add");
-    setEditTarget(null);
-    setForm(EMPTY_FORM);
-    setFormError("");
-    setModalOpen(true);
-  }
-
-  function openEdit(user: User) {
-    setModalMode("edit");
-    setEditTarget(user);
-    setForm({
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      password: "",
-      is_active: user.is_active ?? true,
-    });
-    setFormError("");
-    setModalOpen(true);
-  }
-
-  function closeModal() {
-    if (formLoading) return;
-    setModalOpen(false);
-    setFormError("");
-  }
-
-  async function handleAdd() {
-    if (!form.name || !form.email || !form.password) {
-      setFormError("Nama, email, dan password wajib diisi.");
-      return;
-    }
-    setFormLoading(true);
-    setFormError("");
-    const res = await fetch("/api/admin/users", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-    const data = await res.json();
-    setFormLoading(false);
-    if (!res.ok) {
-      setFormError(data.error || "Gagal menambah user.");
-      return;
-    }
-    setModalOpen(false);
-    await fetchUsers();
-    showToast(`Akun ${data.user.name} berhasil ditambahkan!`, "success");
-  }
-
-  async function handleEdit() {
-    if (!form.name || !form.email) {
-      setFormError("Nama dan email wajib diisi.");
-      return;
-    }
-    if (form.password && form.password.length < 6) {
-      setFormError("Password baru minimal 6 karakter.");
-      return;
-    }
-    setFormLoading(true);
-    setFormError("");
-
-    const body: Partial<FormState> = {
-      name: form.name,
-      email: form.email,
-      role: form.role,
-      is_active: form.is_active,
-    };
-    if (form.password) body.password = form.password;
-
-    const res = await fetch(`/api/admin/users/${editTarget!.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    setFormLoading(false);
-    if (!res.ok) {
-      setFormError(data.error || "Gagal mengupdate user.");
-      return;
-    }
-    setModalOpen(false);
-    await fetchUsers();
-    showToast(`Akun ${data.user.name} berhasil diperbarui!`, "success");
-  }
-
-  async function handleToggleActive(newValue: boolean) {
-    if (!editTarget) return;
-    setForm((p) => ({ ...p, is_active: newValue }));
-    const res = await fetch(`/api/admin/users/${editTarget.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ is_active: newValue }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setForm((p) => ({ ...p, is_active: !newValue }));
-      showToast(data.error || "Gagal mengubah status akun.", "error");
-      return;
-    }
-    setUsers((prev) =>
-      prev.map((u) =>
-        u.id === editTarget.id ? { ...u, is_active: newValue } : u
-      )
-    );
-  }
-
-  async function handleDelete(user: User) {
-    setDeleteLoading(true);
-    const res = await fetch(`/api/admin/users/${user.id}`, { method: "DELETE" });
-    const data = await res.json();
-    setDeleteLoading(false);
-    if (!res.ok) {
-      showToast(data.error || "Gagal menghapus user.", "error");
-    } else {
-      setDeleteTarget(null);
-      await fetchUsers();
-      showToast(`Akun ${user.name} berhasil dihapus.`, "success");
-    }
-  }
+  }, [search, jurusanFilter, statusFilter, sortBy]);
 
   const filtered = useMemo(() => {
-    let list = users.filter(
-      (u) =>
-        u.name.toLowerCase().includes(search.toLowerCase()) ||
-        u.email.toLowerCase().includes(search.toLowerCase())
-    );
-    if (roleFilter !== "all") {
-      list = list.filter((u) => u.role === roleFilter);
-    }
-    return list;
-  }, [users, search, roleFilter]);
+    const q = search.trim().toLowerCase();
+    return pendaftar.filter((p) => {
+      const jurusan = resolveJurusan(p.jurusan);
+      if (jurusanFilter !== "all" && jurusan?.kode !== jurusanFilter) return false;
+      if (!matchesStatusFilter(p.status, statusFilter)) return false;
+      if (!q) return true;
+      const nama = (p.nama_lengkap ?? "").toLowerCase();
+      const nisn = (p.nisn ?? "").toLowerCase();
+      return nama.includes(q) || nisn.includes(q);
+    });
+  }, [pendaftar, search, jurusanFilter, statusFilter]);
 
   const sorted = useMemo(() => {
     const list = [...filtered];
     if (sortBy === "newest") {
       list.sort(
         (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          new Date(b.submitted_at ?? 0).getTime() -
+          new Date(a.submitted_at ?? 0).getTime()
       );
     } else if (sortBy === "oldest") {
       list.sort(
         (a, b) =>
-          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          new Date(a.submitted_at ?? 0).getTime() -
+          new Date(b.submitted_at ?? 0).getTime()
+      );
+    } else if (sortBy === "az") {
+      list.sort((a, b) =>
+        (a.nama_lengkap ?? "").localeCompare(b.nama_lengkap ?? "", "id")
       );
     } else {
-      list.sort((a, b) => a.name.localeCompare(b.name, "id"));
+      list.sort((a, b) => {
+        const aUnverified = a.verified_at ? 0 : 1;
+        const bUnverified = b.verified_at ? 0 : 1;
+        if (bUnverified !== aUnverified) return bUnverified - aUnverified;
+        return (
+          new Date(b.submitted_at ?? 0).getTime() -
+          new Date(a.submitted_at ?? 0).getTime()
+        );
+      });
     }
     return list;
   }, [filtered, sortBy]);
@@ -269,6 +202,11 @@ export default function UsersPage() {
     for (let i = start; i <= end; i++) pages.push(i);
     return pages;
   }, [safePage, totalPages]);
+
+  const hasActiveFilter =
+    search.trim() !== "" ||
+    jurusanFilter !== "all" ||
+    statusFilter !== "all";
 
   return (
     <>
@@ -295,28 +233,6 @@ export default function UsersPage() {
           font-size: 20px;
           font-weight: 700;
           color: #0C0C0C;
-        }
-
-        .btn-add {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          padding: 10px 18px;
-          background: #1C5C38;
-          color: #fff;
-          border: none;
-          border-radius: 8px;
-          font-family: 'Plus Jakarta Sans', sans-serif;
-          font-size: 14px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: background 0.15s, transform 0.15s;
-          white-space: nowrap;
-        }
-
-        .btn-add:hover {
-          background: #2A7A4E;
-          transform: translateY(-1px);
         }
 
         .search-bar {
@@ -357,9 +273,7 @@ export default function UsersPage() {
 
         .toolbar {
           display: flex;
-          align-items: center;
-          justify-content: space-between;
-          flex-wrap: wrap;
+          flex-direction: column;
           gap: 12px;
         }
 
@@ -393,19 +307,35 @@ export default function UsersPage() {
           border-color: #1C5C38;
         }
 
-        .sort-wrap {
+        .toolbar-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 12px;
+        }
+
+        .filter-controls {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+
+        .control-group {
           display: flex;
           align-items: center;
           gap: 8px;
         }
 
-        .sort-label {
+        .control-label {
           font-size: 13px;
           color: #6B7280;
           font-weight: 500;
+          white-space: nowrap;
         }
 
-        .sort-select {
+        .control-select {
           padding: 8px 32px 8px 12px;
           border: 1px solid #E5E7EB;
           border-radius: 8px;
@@ -422,46 +352,44 @@ export default function UsersPage() {
           background-position: right 10px center;
         }
 
-        .sort-select:focus {
+        .control-select:focus {
           border-color: #1C5C38;
         }
 
-        .users-grid {
+        .pendaftar-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+          grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
           gap: 16px;
         }
 
-        .user-card {
+        .pendaftar-card {
           background: #fff;
           border: 1px solid #E5E7EB;
           border-radius: 12px;
           padding: 20px;
           display: flex;
           flex-direction: column;
-          gap: 14px;
+          gap: 12px;
           transition: transform 0.2s, box-shadow 0.2s;
         }
 
-        .user-card:hover {
+        .pendaftar-card:hover {
           transform: translateY(-2px);
           box-shadow: 0 8px 24px rgba(28, 92, 56, 0.1);
         }
 
-        .user-card-top {
+        .card-top {
           display: flex;
           align-items: center;
           gap: 14px;
         }
 
-        .user-avatar {
+        .card-avatar {
           width: 48px;
           height: 48px;
           border-radius: 50%;
-          background: #EBF4EE;
-          color: #1C5C38;
           font-family: 'Bricolage Grotesque', sans-serif;
-          font-size: 18px;
+          font-size: 16px;
           font-weight: 700;
           display: flex;
           align-items: center;
@@ -469,16 +397,16 @@ export default function UsersPage() {
           flex-shrink: 0;
         }
 
-        .user-info { min-width: 0; flex: 1; }
+        .card-info { min-width: 0; flex: 1; }
 
-        .user-name {
+        .card-name {
           font-size: 15px;
           font-weight: 600;
           color: #0C0C0C;
           line-height: 1.3;
         }
 
-        .user-email {
+        .card-email {
           font-size: 13px;
           font-weight: 400;
           color: #6B7280;
@@ -488,29 +416,20 @@ export default function UsersPage() {
           white-space: nowrap;
         }
 
-        .user-badges {
+        .card-badges {
           display: flex;
           align-items: center;
           gap: 8px;
           flex-wrap: wrap;
         }
 
-        .role-pill {
+        .jurusan-pill {
           padding: 4px 10px;
           border-radius: 6px;
           font-size: 11px;
           font-weight: 600;
-          text-transform: capitalize;
-        }
-
-        .role-pill.admin {
           background: #EBF4EE;
           color: #1C5C38;
-        }
-
-        .role-pill.user {
-          background: #F3F4F6;
-          color: #6B7280;
         }
 
         .status-pill {
@@ -520,13 +439,36 @@ export default function UsersPage() {
           font-weight: 600;
         }
 
-        .status-pill.active {
+        .status-pill.menunggu {
+          background: #FEF3C7;
+          color: #92400E;
+        }
+
+        .status-pill.diterima {
           background: #D1FAE5;
           color: #065F46;
         }
 
-        .status-pill.inactive {
-          background: #F3F4F6;
+        .status-pill.ditolak {
+          background: #FEE2E2;
+          color: #991B1B;
+        }
+
+        .card-meta {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+
+        .meta-nisn {
+          font-family: ui-monospace, 'Cascadia Code', 'Consolas', monospace;
+          font-size: 12px;
+          color: #374151;
+          letter-spacing: 0.02em;
+        }
+
+        .meta-date {
+          font-size: 12px;
           color: #6B7280;
         }
 
@@ -534,12 +476,12 @@ export default function UsersPage() {
           display: flex;
           gap: 8px;
           margin-top: auto;
-          padding-top: 4px;
+          padding-top: 8px;
           border-top: 1px solid #F3F4F6;
         }
 
-        .btn-edit,
-        .btn-del {
+        .btn-detail,
+        .btn-verify {
           flex: 1;
           display: inline-flex;
           align-items: center;
@@ -554,77 +496,29 @@ export default function UsersPage() {
           transition: background 0.15s, border-color 0.15s, color 0.15s;
         }
 
-        .btn-edit {
+        .btn-detail {
           background: #fff;
           color: #374151;
           border: 1px solid #E5E7EB;
         }
 
-        .btn-edit:hover {
+        .btn-detail:hover {
           background: #F2F8F4;
           border-color: #EBF4EE;
           color: #1C5C38;
         }
 
-        .btn-del {
-          background: #fff;
-          color: #DC2626;
-          border: 1px solid #E5E7EB;
-        }
-
-        .btn-del:hover {
-          background: #FEE2E2;
-          border-color: #FECACA;
-        }
-
-        .delete-confirm {
-          background: #FEF2F2;
-          border: 1px solid #FECACA;
-          border-radius: 8px;
-          padding: 14px;
-          margin-top: 4px;
-        }
-
-        .delete-confirm p {
-          font-size: 13px;
-          color: #374151;
-          margin-bottom: 10px;
-          line-height: 1.4;
-        }
-
-        .delete-confirm strong { color: #0C0C0C; }
-
-        .confirm-btns { display: flex; gap: 8px; }
-
-        .confirm-yes {
-          flex: 1;
-          padding: 8px;
-          background: #DC2626;
+        .btn-verify {
+          background: #1C5C38;
           color: #fff;
-          border: none;
-          border-radius: 8px;
-          font-family: inherit;
-          font-size: 13px;
-          font-weight: 600;
-          cursor: pointer;
+          border: 1px solid #1C5C38;
         }
 
-        .confirm-yes:disabled { opacity: 0.6; cursor: not-allowed; }
-
-        .confirm-no {
-          flex: 1;
-          padding: 8px;
-          background: #fff;
-          color: #6B7280;
-          border: 1px solid #E5E7EB;
-          border-radius: 8px;
-          font-family: inherit;
-          font-size: 13px;
-          font-weight: 600;
-          cursor: pointer;
+        .btn-verify:hover {
+          background: #2A7A4E;
+          border-color: #2A7A4E;
         }
 
-        /* Skeleton */
         .skeleton-card {
           background: #fff;
           border: 1px solid #E5E7EB;
@@ -647,6 +541,11 @@ export default function UsersPage() {
           animation: shimmer 1.5s infinite;
         }
 
+        @keyframes shimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+
         .skeleton-avatar {
           width: 48px;
           height: 48px;
@@ -660,199 +559,6 @@ export default function UsersPage() {
           align-items: center;
         }
 
-        /* Modal */
-        .modal-overlay {
-          position: fixed;
-          inset: 0;
-          background: rgba(0, 0, 0, 0.4);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 100;
-          padding: 20px;
-        }
-
-        .modal {
-          background: #fff;
-          border-radius: 12px;
-          padding: 24px;
-          width: 100%;
-          max-width: 480px;
-          max-height: 90vh;
-          overflow-y: auto;
-          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
-        }
-
-        .modal-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-bottom: 20px;
-        }
-
-        .modal-header h3 {
-          font-family: 'Bricolage Grotesque', sans-serif;
-          font-size: 18px;
-          font-weight: 700;
-          color: #0C0C0C;
-        }
-
-        .modal-close {
-          width: 32px;
-          height: 32px;
-          border-radius: 8px;
-          border: 1px solid #E5E7EB;
-          background: #fff;
-          cursor: pointer;
-          font-size: 18px;
-          color: #6B7280;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .modal-close:hover { background: #F3F4F6; }
-
-        .mform-group { margin-bottom: 16px; }
-
-        .mlabel {
-          display: block;
-          font-size: 12px;
-          font-weight: 600;
-          color: #374151;
-          margin-bottom: 6px;
-        }
-
-        .minput,
-        .mselect {
-          width: 100%;
-          padding: 10px 12px;
-          border: 1px solid #E5E7EB;
-          border-radius: 8px;
-          font-family: 'Plus Jakarta Sans', sans-serif;
-          font-size: 14px;
-          color: #0C0C0C;
-          background: #fff;
-          outline: none;
-          transition: border-color 0.2s, box-shadow 0.2s;
-        }
-
-        .minput:focus,
-        .mselect:focus {
-          border-color: #1C5C38;
-          box-shadow: 0 0 0 3px rgba(28, 92, 56, 0.08);
-        }
-
-        .mselect {
-          cursor: pointer;
-          appearance: none;
-          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-          background-repeat: no-repeat;
-          background-position: right 12px center;
-        }
-
-        .mhint {
-          font-size: 11px;
-          color: #6B7280;
-          margin-top: 4px;
-        }
-
-        .toggle-row {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 12px 0 4px;
-        }
-
-        .toggle-label {
-          font-size: 14px;
-          font-weight: 600;
-          color: #0C0C0C;
-        }
-
-        .toggle-hint {
-          font-size: 12px;
-          color: #6B7280;
-          margin-top: 2px;
-        }
-
-        .toggle-switch {
-          position: relative;
-          width: 44px;
-          height: 24px;
-          border: none;
-          border-radius: 12px;
-          cursor: pointer;
-          flex-shrink: 0;
-          transition: background 0.2s;
-          padding: 0;
-        }
-
-        .toggle-switch.on { background: #1C5C38; }
-        .toggle-switch.off { background: #D1D5DB; }
-
-        .toggle-knob {
-          position: absolute;
-          top: 3px;
-          left: 3px;
-          width: 18px;
-          height: 18px;
-          border-radius: 50%;
-          background: #fff;
-          transition: transform 0.2s;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
-        }
-
-        .toggle-switch.on .toggle-knob { transform: translateX(20px); }
-
-        .merror {
-          background: #FEE2E2;
-          border: 1px solid #FECACA;
-          border-radius: 8px;
-          padding: 10px 12px;
-          font-size: 13px;
-          color: #991B1B;
-          margin-bottom: 16px;
-        }
-
-        .modal-actions {
-          display: flex;
-          justify-content: flex-end;
-          gap: 10px;
-          margin-top: 8px;
-        }
-
-        .btn-cancel {
-          padding: 10px 20px;
-          background: #fff;
-          color: #374151;
-          border: 1px solid #E5E7EB;
-          border-radius: 8px;
-          font-family: inherit;
-          font-size: 14px;
-          font-weight: 600;
-          cursor: pointer;
-        }
-
-        .btn-cancel:hover { background: #F9FAFB; }
-
-        .btn-submit {
-          padding: 10px 24px;
-          background: #1C5C38;
-          color: #fff;
-          border: none;
-          border-radius: 8px;
-          font-family: inherit;
-          font-size: 14px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: background 0.15s;
-        }
-
-        .btn-submit:hover:not(:disabled) { background: #2A7A4E; }
-        .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
-
-        /* Pagination */
         .pagination {
           display: flex;
           align-items: center;
@@ -903,31 +609,6 @@ export default function UsersPage() {
           margin-right: 8px;
         }
 
-        /* Toast */
-        .toast {
-          position: fixed;
-          bottom: 28px;
-          right: 28px;
-          z-index: 200;
-          padding: 13px 18px;
-          border-radius: 8px;
-          font-size: 13px;
-          font-weight: 600;
-          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-        }
-
-        .toast.success {
-          background: #D1FAE5;
-          color: #065F46;
-          border: 1px solid #A7F3D0;
-        }
-
-        .toast.error {
-          background: #FEE2E2;
-          color: #991B1B;
-          border: 1px solid #FECACA;
-        }
-
         .empty-state {
           text-align: center;
           padding: 48px 20px;
@@ -939,18 +620,15 @@ export default function UsersPage() {
         }
 
         @media (max-width: 640px) {
-          .toolbar { flex-direction: column; align-items: stretch; }
-          .sort-wrap { justify-content: space-between; }
+          .toolbar-row { flex-direction: column; align-items: stretch; }
+          .filter-controls { flex-direction: column; align-items: stretch; }
+          .control-group { justify-content: space-between; }
         }
       `}</style>
 
       <div className="page">
         <header className="page-header" data-animate data-delay="0">
-          <h1 className="page-title">Manajemen Pengguna</h1>
-          <button type="button" className="btn-add" onClick={openAdd}>
-            <Plus size={18} strokeWidth={2.5} />
-            Tambah Pengguna
-          </button>
+          <h1 className="page-title">Manajemen Pendaftar</h1>
         </header>
 
         <div className="search-bar" data-animate data-delay="50">
@@ -958,7 +636,7 @@ export default function UsersPage() {
           <input
             className="search-input"
             type="text"
-            placeholder="Cari pengguna..."
+            placeholder="Cari nama atau NISN..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -966,40 +644,60 @@ export default function UsersPage() {
 
         <div className="toolbar" data-animate data-delay="100">
           <div className="filter-tabs">
-            {(
-              [
-                { key: "all" as RoleFilter, label: "Semua" },
-                { key: "admin" as RoleFilter, label: "Admin" },
-                { key: "user" as RoleFilter, label: "User" },
-              ] as const
-            ).map((tab) => (
+            <button
+              type="button"
+              className={`filter-tab${jurusanFilter === "all" ? " active" : ""}`}
+              onClick={() => setJurusanFilter("all")}
+            >
+              Semua
+            </button>
+            {JURUSAN_KODES.map((kode) => (
               <button
-                key={tab.key}
+                key={kode}
                 type="button"
-                className={`filter-tab${roleFilter === tab.key ? " active" : ""}`}
-                onClick={() => setRoleFilter(tab.key)}
+                className={`filter-tab${jurusanFilter === kode ? " active" : ""}`}
+                onClick={() => setJurusanFilter(kode)}
               >
-                {tab.label}
+                {kode}
               </button>
             ))}
           </div>
 
-          <div className="sort-wrap">
-            <span className="sort-label">Urutkan</span>
-            <select
-              className="sort-select"
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortOption)}
-            >
-              <option value="newest">Terbaru</option>
-              <option value="oldest">Terlama</option>
-              <option value="az">A-Z</option>
-            </select>
+          <div className="toolbar-row">
+            <div className="filter-controls">
+              <div className="control-group">
+                <span className="control-label">Status</span>
+                <select
+                  className="control-select"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+                >
+                  <option value="all">Semua</option>
+                  <option value="menunggu">Menunggu</option>
+                  <option value="diterima">Diterima</option>
+                  <option value="ditolak">Ditolak</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="control-group">
+              <span className="control-label">Urutkan</span>
+              <select
+                className="control-select"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as SortOption)}
+              >
+                <option value="newest">Terbaru</option>
+                <option value="oldest">Terlama</option>
+                <option value="az">A-Z</option>
+                <option value="unverified">Belum Diverifikasi</option>
+              </select>
+            </div>
           </div>
         </div>
 
         {loading ? (
-          <div className="users-grid">
+          <div className="pendaftar-grid">
             {Array.from({ length: SKELETON_COUNT }).map((_, i) => (
               <div className="skeleton-card" key={i}>
                 <div className="skeleton-row">
@@ -1016,88 +714,66 @@ export default function UsersPage() {
           </div>
         ) : paginated.length === 0 ? (
           <div className="empty-state" data-animate data-delay="0">
-            {search || roleFilter !== "all"
-              ? "Tidak ada pengguna yang cocok dengan filter."
-              : "Belum ada pengguna."}
+            {hasActiveFilter
+              ? "Tidak ada pendaftar yang cocok dengan filter."
+              : "Belum ada pendaftar."}
           </div>
         ) : (
           <>
-            <div className="users-grid" data-animate data-delay="150">
-              {paginated.map((user, idx) => {
-                const isActive = user.is_active ?? true;
+            <div className="pendaftar-grid" data-animate data-delay="150">
+              {paginated.map((item, idx) => {
+                const jurusan = resolveJurusan(item.jurusan);
+                const profile = resolveProfile(item.profiles);
+                const email = profile?.email ?? "—";
+                const badge = statusBadge(item.status);
+                const colors = avatarColor(item.nama_lengkap ?? "");
+
                 return (
                   <article
-                    key={user.id}
-                    className="user-card"
+                    key={item.id}
+                    className="pendaftar-card"
                     data-animate
                     data-delay={String(200 + idx * 50)}
                   >
-                    <div className="user-card-top">
-                      <div className="user-avatar">
-                        {user.name.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="user-info">
-                        <div className="user-name">{user.name}</div>
-                        <div className="user-email">{user.email}</div>
-                      </div>
-                    </div>
-
-                    <div className="user-badges">
-                      <span className={`role-pill ${user.role}`}>
-                        {user.role === "admin" ? "Admin" : "User"}
-                      </span>
-                      <span
-                        className={`status-pill ${isActive ? "active" : "inactive"}`}
+                    <div className="card-top">
+                      <div
+                        className="card-avatar"
+                        style={{ background: colors.bg, color: colors.color }}
                       >
-                        {isActive ? "Aktif" : "Nonaktif"}
+                        {getInitials(item.nama_lengkap)}
+                      </div>
+                      <div className="card-info">
+                        <div className="card-name">{item.nama_lengkap || "—"}</div>
+                        <div className="card-email">{email}</div>
+                      </div>
+                    </div>
+
+                    <div className="card-badges">
+                      {jurusan?.kode && (
+                        <span className="jurusan-pill">{jurusan.kode}</span>
+                      )}
+                      <span className={`status-pill ${badge.variant}`}>
+                        {badge.label}
                       </span>
                     </div>
 
-                    {deleteTarget?.id !== user.id ? (
-                      <div className="card-actions">
-                        <button
-                          type="button"
-                          className="btn-edit"
-                          onClick={() => openEdit(user)}
-                        >
-                          <Pencil size={15} />
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-del"
-                          onClick={() => setDeleteTarget(user)}
-                        >
-                          <Trash2 size={15} />
-                          Hapus
-                        </button>
+                    <div className="card-meta">
+                      <div className="meta-nisn">NISN: {item.nisn || "—"}</div>
+                      <div className="meta-date">
+                        Daftar: {formatTanggalDaftar(item.submitted_at)}
                       </div>
-                    ) : (
-                      <div className="delete-confirm">
-                        <p>
-                          Hapus akun <strong>{user.name}</strong>? Tindakan ini
-                          tidak bisa dibatalkan.
-                        </p>
-                        <div className="confirm-btns">
-                          <button
-                            type="button"
-                            className="confirm-yes"
-                            disabled={deleteLoading}
-                            onClick={() => handleDelete(user)}
-                          >
-                            {deleteLoading ? "Menghapus..." : "Ya, Hapus"}
-                          </button>
-                          <button
-                            type="button"
-                            className="confirm-no"
-                            onClick={() => setDeleteTarget(null)}
-                            disabled={deleteLoading}
-                          >
-                            Batal
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                    </div>
+
+                    <div className="card-actions">
+                      <button type="button" className="btn-detail">
+                        <Eye size={15} />
+                        Detail
+                      </button>
+                      <button type="button" className="btn-verify">
+                        <ClipboardCheck size={15} />
+                        Verifikasi
+                      </button>
+                    </div>
                   </article>
                 );
               })}
@@ -1106,7 +782,7 @@ export default function UsersPage() {
             {sorted.length > PAGE_SIZE && (
               <nav className="pagination" data-animate data-delay="100">
                 <span className="page-info">
-                  {sorted.length} pengguna · halaman {safePage}/{totalPages}
+                  {sorted.length} pendaftar · halaman {safePage}/{totalPages}
                 </span>
                 <button
                   type="button"
@@ -1143,148 +819,6 @@ export default function UsersPage() {
           </>
         )}
       </div>
-
-      {modalOpen && (
-        <div
-          className="modal-overlay"
-          onClick={(e) => e.target === e.currentTarget && closeModal()}
-        >
-          <div className="modal">
-            <div className="modal-header">
-              <h3>
-                {modalMode === "add" ? "Tambah Pengguna" : "Edit Pengguna"}
-              </h3>
-              <button
-                type="button"
-                className="modal-close"
-                onClick={closeModal}
-                aria-label="Tutup"
-              >
-                ×
-              </button>
-            </div>
-
-            {formError && <div className="merror">{formError}</div>}
-
-            <div className="mform-group">
-              <label className="mlabel" htmlFor="user-name">
-                Nama Lengkap
-              </label>
-              <input
-                id="user-name"
-                className="minput"
-                type="text"
-                placeholder="Nama lengkap"
-                value={form.name}
-                onChange={(e) =>
-                  setForm((p) => ({ ...p, name: e.target.value }))
-                }
-              />
-            </div>
-
-            <div className="mform-group">
-              <label className="mlabel" htmlFor="user-email">
-                Email
-              </label>
-              <input
-                id="user-email"
-                className="minput"
-                type="email"
-                placeholder="email@spmb.com"
-                value={form.email}
-                onChange={(e) =>
-                  setForm((p) => ({ ...p, email: e.target.value }))
-                }
-              />
-            </div>
-
-            <div className="mform-group">
-              <label className="mlabel" htmlFor="user-password">
-                {modalMode === "edit" ? "Password Baru" : "Password"}
-              </label>
-              <input
-                id="user-password"
-                className="minput"
-                type="password"
-                placeholder={
-                  modalMode === "edit"
-                    ? "Kosongkan jika tidak diubah"
-                    : "Min. 6 karakter"
-                }
-                value={form.password}
-                onChange={(e) =>
-                  setForm((p) => ({ ...p, password: e.target.value }))
-                }
-              />
-              {modalMode === "edit" && (
-                <p className="mhint">
-                  Biarkan kosong untuk mempertahankan password lama.
-                </p>
-              )}
-            </div>
-
-            <div className="mform-group">
-              <label className="mlabel" htmlFor="user-role">
-                Role
-              </label>
-              <select
-                id="user-role"
-                className="mselect"
-                value={form.role}
-                onChange={(e) =>
-                  setForm((p) => ({
-                    ...p,
-                    role: e.target.value as "admin" | "user",
-                  }))
-                }
-              >
-                <option value="user">User</option>
-                <option value="admin">Admin</option>
-              </select>
-            </div>
-
-            {modalMode === "edit" && (
-              <div className="toggle-row">
-                <div>
-                  <div className="toggle-label">Status Akun</div>
-                  <div className="toggle-hint">
-                    {form.is_active ? "Pengguna dapat login" : "Login dinonaktifkan"}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className={`toggle-switch${form.is_active ? " on" : " off"}`}
-                  onClick={() => handleToggleActive(!form.is_active)}
-                  aria-pressed={form.is_active}
-                  aria-label="Toggle status aktif"
-                >
-                  <span className="toggle-knob" />
-                </button>
-              </div>
-            )}
-
-            <div className="modal-actions">
-              <button type="button" className="btn-cancel" onClick={closeModal}>
-                Batal
-              </button>
-              <button
-                type="button"
-                className="btn-submit"
-                disabled={formLoading}
-                onClick={modalMode === "add" ? handleAdd : handleEdit}
-              >
-                {formLoading
-                  ? modalMode === "add"
-                    ? "Menambahkan..."
-                    : "Menyimpan..."
-                  : "Simpan"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {toast && <div className={`toast ${toast.type}`}>{toast.msg}</div>}
     </>
   );
 }

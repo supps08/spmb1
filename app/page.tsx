@@ -24,10 +24,19 @@ import HeroCountdown from "@/components/landing/hero-countdown";
 export default function LandingPage() {
   const [navUser, setNavUser] = useState<{ name: string; role: string } | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [dropdownClosing, setDropdownClosing] = useState(false);
+
+  function closeDropdown() {
+    setDropdownClosing(true);
+    setTimeout(() => {
+      setDropdownOpen(false);
+      setDropdownClosing(false);
+    }, 180);
+  }
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setDropdownOpen(false);
+      if (e.key === "Escape") closeDropdown();
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -182,6 +191,10 @@ export default function LandingPage() {
         @keyframes float-d { 0%,100%{transform:translateY(0) rotate(2deg)} 50%{transform:translateY(-10px) rotate(2deg)} }
         @keyframes marquee-left { from{transform:translateX(0)} to{transform:translateX(-50%)} }
         @keyframes marquee-right { from{transform:translateX(-50%)} to{transform:translateX(0)} }
+        @keyframes fadeDown {
+          from { opacity: 1; transform: translateY(0); }
+          to   { opacity: 0; transform: translateY(-8px); }
+        }
         @keyframes fadeUp { from{opacity:0;transform:translateY(28px)} to{opacity:1;transform:translateY(0)} }
         @keyframes fadeIn { from{opacity:0} to{opacity:1} }
         @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.3)} }
@@ -209,7 +222,8 @@ export default function LandingPage() {
         }
         .nav-inner {
           display: flex; align-items: center;
-          justify-content: space-between; height: 68px; gap: 32px;
+          justify-content: space-between; height: 68px; gap: 24px;
+          width: 100%;
         }
         .nav-logo {
           font-family: 'Bricolage Grotesque', sans-serif;
@@ -615,9 +629,9 @@ export default function LandingPage() {
               <li><a href="#kontak">Kontak</a></li>
             </ul>
             {navUser ? (
-              <div style={{ position: "relative" }}>
+              <div style={{ position: "relative", flexShrink: 0 }}>
                 <button
-                  onClick={() => setDropdownOpen(!dropdownOpen)}
+                  onClick={() => dropdownOpen ? closeDropdown() : setDropdownOpen(true)}
                   style={{
                     width: 40,
                     height: 40,
@@ -640,7 +654,7 @@ export default function LandingPage() {
                 {dropdownOpen && (
                   <>
                     <div
-                      onClick={() => setDropdownOpen(false)}
+                      onClick={() => closeDropdown()}
                       style={{ position: "fixed", inset: 0, zIndex: 40 }}
                     />
                     <div
@@ -655,7 +669,7 @@ export default function LandingPage() {
                         minWidth: 200,
                         zIndex: 50,
                         overflow: "hidden",
-                        animation: "fadeUp 0.2s ease",
+                        animation: dropdownClosing ? "fadeDown 0.18s ease forwards" : "fadeUp 0.2s ease",
                       }}
                     >
                       <div
