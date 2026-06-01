@@ -8,6 +8,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Check,
@@ -1245,6 +1246,25 @@ export default function PendaftaranPage() {
           align-self: flex-start;
         }
 
+        .btn-kartu-link {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          margin-top: 24px;
+          padding: 12px 24px;
+          border: 2px solid #1C5C38;
+          border-radius: 10px;
+          color: #1C5C38;
+          font-size: 0.9rem;
+          font-weight: 600;
+          text-decoration: none;
+          transition: background 0.2s, color 0.2s;
+        }
+        .btn-kartu-link:hover {
+          background: #1C5C38;
+          color: #fff;
+        }
+
         @media (max-width: 768px) {
           .form-grid-2,
           .form-grid-4,
@@ -1263,6 +1283,11 @@ export default function PendaftaranPage() {
           }
         }
       `}</style>
+
+      <div className="pend-page-header">
+        <h1>Formulir Pendaftaran</h1>
+        <p>Lengkapi data diri Anda untuk memulai masa depan digital.</p>
+      </div>
 
       <div style={{ textAlign: "center" }}>
         {!countdown.isExpired && tanggalTutup && (
@@ -1906,6 +1931,14 @@ export default function PendaftaranPage() {
               <div className="disclaimer-box">
                 Pastikan semua data sudah benar. Data yang telah dikirim tidak dapat diubah.
               </div>
+
+              {alreadySubmitted && (
+                <div style={{ textAlign: "center" }}>
+                  <Link href="/pendaftaran/kartu" className="btn-kartu-link">
+                    Lihat Kartu Pendaftaran →
+                  </Link>
+                </div>
+              )}
             </>
           )}
 
@@ -1995,6 +2028,30 @@ export default function PendaftaranPage() {
       {toast && (
         <div className={`pend-toast ${toast.type}`}>{toast.msg}</div>
       )}
+
+      <div className="trust-badges">
+        <div className="trust-badge">
+          <div className="trust-badge-icon green">🛡️</div>
+          <div>
+            <div className="trust-badge-title green">Data Terenkripsi</div>
+            <div className="trust-badge-desc">Informasi kamu aman bersama sistem kami.</div>
+          </div>
+        </div>
+        <div className="trust-badge">
+          <div className="trust-badge-icon yellow">⚡</div>
+          <div>
+            <div className="trust-badge-title yellow">Proses Cepat</div>
+            <div className="trust-badge-desc">Estimasi pendaftaran hanya 10 menit.</div>
+          </div>
+        </div>
+        <div className="trust-badge">
+          <div className="trust-badge-icon blue">🎧</div>
+          <div>
+            <div className="trust-badge-title blue">Butuh Bantuan?</div>
+            <div className="trust-badge-desc">Hubungi CS kami di (021) 77201052.</div>
+          </div>
+        </div>
+      </div>
     </>
   );
 }

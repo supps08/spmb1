@@ -12,6 +12,7 @@ export default function PendaftaranLayout({ children }: { children: React.ReactN
   return (
     <>
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700;800&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         :root {
           --accent: #1C5C38;
@@ -124,39 +125,7 @@ export default function PendaftaranLayout({ children }: { children: React.ReactN
       </nav>
 
       {/* Content */}
-      <main className="pend-main">
-        <div className="pend-page-header">
-          <h1>Formulir Pendaftaran</h1>
-          <p>Lengkapi data diri Anda untuk memulai masa depan digital.</p>
-        </div>
-
-        {children}
-
-        {/* Trust badges */}
-        <div className="trust-badges">
-          <div className="trust-badge">
-            <div className="trust-badge-icon green">🛡️</div>
-            <div>
-              <div className="trust-badge-title green">Data Terenkripsi</div>
-              <div className="trust-badge-desc">Informasi kamu aman bersama sistem kami.</div>
-            </div>
-          </div>
-          <div className="trust-badge">
-            <div className="trust-badge-icon yellow">⚡</div>
-            <div>
-              <div className="trust-badge-title yellow">Proses Cepat</div>
-              <div className="trust-badge-desc">Estimasi pendaftaran hanya 10 menit.</div>
-            </div>
-          </div>
-          <div className="trust-badge">
-            <div className="trust-badge-icon blue">🎧</div>
-            <div>
-              <div className="trust-badge-title blue">Butuh Bantuan?</div>
-              <div className="trust-badge-desc">Hubungi CS kami di (021) 77201052.</div>
-            </div>
-          </div>
-        </div>
-      </main>
+      <main className="pend-main">{children}</main>
 
       <LandingFooter />
     </>

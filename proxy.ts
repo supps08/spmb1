@@ -1,7 +1,7 @@
 // ============================================================
-// PATH : middleware.ts
+// PATH : proxy.ts
 // ISI  : Proteksi route dengan Supabase session + refresh cookie
-//        PUBLIC_PATHS bebas akses, /dashboard/* butuh session
+//        PUBLIC_PATHS bebas akses, /dashboard/* butuh session + role admin
 // ============================================================
 
 import { createServerClient } from "@supabase/ssr";
@@ -14,14 +14,12 @@ const PUBLIC_PATHS = [
   "/hasil-seleksi",
   "/api/auth/login",
   "/api/auth/register",
+  "/api/jurusan/kuota",
 ];
 
 export async function proxy(request: NextRequest) {
-  // Siapkan response default (akan di-mutate jika Supabase perlu set cookie)
   let supabaseResponse = NextResponse.next({ request });
 
-  // Buat Supabase client khusus middleware (bukan createClient dari server.ts
-  // karena middleware butuh akses ke request.cookies secara langsung)
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -31,11 +29,9 @@ export async function proxy(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          // Set cookie di request (untuk server components yang mungkin dirender)
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
-          // Buat ulang response agar cookie refresh disertakan di response
           supabaseResponse = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
@@ -45,8 +41,6 @@ export async function proxy(request: NextRequest) {
     }
   );
 
-  // PENTING: Panggil getUser() untuk memperbarui/memvalidasi session.
-  // Jangan gunakan getSession() di middleware — tidak aman (JWT bisa dimanipulasi).
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -58,17 +52,31 @@ export async function proxy(request: NextRequest) {
     return supabaseResponse;
   }
 
-  // Jika tidak ada session:
+  // Tidak ada session → redirect ke login
   if (!user) {
-    // API route → kembalikan 401 JSON
     if (pathname.startsWith("/api")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    // Page route → redirect ke /login
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  // Session ada → teruskan request dengan cookie yang sudah di-refresh
+  // Cek role untuk /dashboard/*
+  if (pathname.startsWith("/dashboard") || pathname.startsWith("/api/admin")) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile || profile.role !== "admin") {
+      // User biasa coba akses dashboard → redirect ke /pendaftaran
+      if (pathname.startsWith("/api")) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+      return NextResponse.redirect(new URL("/pendaftaran", request.url));
+    }
+  }
+
   return supabaseResponse;
 }
 

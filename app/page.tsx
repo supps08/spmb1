@@ -13,18 +13,59 @@
 //          - Footer
 // ============================================================
 
+"use client";
+
+import { useEffect } from "react";
 import Link from "next/link";
 import LandingFooter from "@/components/landing/footer";
 import StatsBlock from "@/components/landing/stats-block";
 import HeroCountdown from "@/components/landing/hero-countdown";
 
-export const metadata = {
-  title: "SPMB SMK Citra Negara — Pendaftaran Online",
-  description:
-    "Daftar sekarang di SMK Citra Negara Depok. Sistem Penerimaan Murid Baru online yang cepat dan mudah.",
-};
-
 export default function LandingPage() {
+  useEffect(() => {
+    // Navbar scroll effect
+    const navbar = document.getElementById("lp-navbar");
+    const handleScroll = () => {
+      if (navbar) navbar.classList.toggle("scrolled", window.scrollY > 60);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    // Scroll reveal
+    const reveals = document.querySelectorAll(".reveal");
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("visible");
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.12 }
+    );
+    reveals.forEach((el) => observer.observe(el));
+
+    // Smooth scroll
+    const links = document.querySelectorAll('a[href^="#"]');
+    const handleClick = (e: Event) => {
+      const a = e.currentTarget as HTMLAnchorElement;
+      const href = a.getAttribute("href");
+      if (!href || href === "#") return;
+      const target = document.querySelector(href);
+      if (target) {
+        e.preventDefault();
+        target.scrollIntoView({ behavior: "smooth" });
+      }
+    };
+    links.forEach((a) => a.addEventListener("click", handleClick));
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      observer.disconnect();
+      links.forEach((a) => a.removeEventListener("click", handleClick));
+    };
+  }, []);
+
   return (
     <>
       <style>{`
@@ -961,41 +1002,6 @@ export default function LandingPage() {
 
       <LandingFooter />
 
-      {/* ===== CLIENT SCRIPTS ===== */}
-      <script dangerouslySetInnerHTML={{ __html: `
-        // Navbar scroll effect
-        const navbar = document.getElementById('lp-navbar');
-        if (navbar) {
-          window.addEventListener('scroll', () => {
-            navbar.classList.toggle('scrolled', window.scrollY > 60);
-          });
-        }
-
-        // Scroll reveal
-        const reveals = document.querySelectorAll('.reveal');
-        const revealObserver = new IntersectionObserver((entries) => {
-          entries.forEach(entry => {
-            if (entry.isIntersecting) {
-              entry.target.classList.add('visible');
-              revealObserver.unobserve(entry.target);
-            }
-          });
-        }, { threshold: 0.12 });
-        reveals.forEach(el => revealObserver.observe(el));
-
-        // Smooth scroll
-        document.querySelectorAll('a[href^="#"]').forEach(a => {
-          a.addEventListener('click', e => {
-            const href = a.getAttribute('href');
-            if (href === '#') return;
-            const target = document.querySelector(href);
-            if (target) {
-              e.preventDefault();
-              target.scrollIntoView({ behavior: 'smooth' });
-            }
-          });
-        });
-      ` }} />
     </>
   );
 }
