@@ -1,45 +1,36 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [form, setForm] = useState({ name: "", email: "", whatsapp: "", password: "", confirm: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
-  useEffect(() => {
-    const saved = localStorage.getItem("spmb_last_email");
-    if (saved) setEmail(saved);
-  }, []);
+  const [showConfirmPass, setShowConfirmPass] = useState(false);
 
-  async function handleLogin(e: React.FormEvent) {
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const { name, value } = e.target;
+    setForm(p => ({ ...p, [name]: value }));
+  }
+
+  async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    if (form.password !== form.confirm) { setError("Password dan konfirmasi tidak cocok."); return; }
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/login", {
+      const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ name: form.name, email: form.email, password: form.password, phone: form.whatsapp }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "Login gagal.");
-      } else {
-        localStorage.setItem("spmb_last_email", email);
-        if (data.user?.role === "admin") {
-          router.push("/dashboard");
-        } else {
-          router.push("/pendaftaran");
-        }
-      }
-    } catch {
-      setError("Koneksi gagal. Coba lagi.");
-    } finally {
-      setLoading(false);
-    }
+      if (!res.ok) { setError(data.error || "Registrasi gagal."); }
+      else { router.push("/pendaftaran"); }
+    } catch { setError("Koneksi gagal. Coba lagi."); }
+    finally { setLoading(false); }
   }
 
   return (
@@ -214,6 +205,10 @@ export default function LoginPage() {
           box-shadow: 0 0 0 3px rgba(28, 92, 56, 0.15);
         }
 
+        input.input-error {
+          border-color: #E74C3C;
+        }
+
         .toggle-pass {
           position: absolute;
           right: 14px;
@@ -313,8 +308,8 @@ export default function LoginPage() {
           <div className="auth-card">
             <div className="brand">
               <div className="brand-icon">🎓</div>
-              <h1>Login Pendaftaran Citra Negara</h1>
-              <p>Masuk ke portal pendaftaran Citra Negara untuk melanjutkan proses admisi Anda.</p>
+              <h1>Registrasi Akun Citra Negara</h1>
+              <p>Daftar ke portal pendaftaran Citra Negara untuk memulai proses admisi Anda.</p>
             </div>
 
             {error && (
@@ -323,40 +318,75 @@ export default function LoginPage() {
               </div>
             )}
 
-            <form onSubmit={handleLogin}>
+            <form onSubmit={handleRegister}>
               <div className="form-group">
-                <label>Email atau Username</label>
+                <label>Nama Lengkap</label>
                 <div className="input-wrap">
                   <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
                   </svg>
                   <input
                     type="text"
-                    placeholder="email@spmb.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    name="name"
+                    placeholder="Nama Lengkap Anda"
+                    value={form.name}
+                    onChange={handleChange}
                     required
-                    autoComplete="username"
+                    autoComplete="name"
                   />
                 </div>
               </div>
 
               <div className="form-group">
-                <div className="label-row">
-                  <label>Kata Sandi</label>
-                  <a href="#" className="forgot-link">Lupa Password?</a>
+                <label>Email</label>
+                <div className="input-wrap">
+                  <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                  </svg>
+                  <input
+                    type="email"
+                    name="email"
+                    placeholder="contoh@email.com"
+                    value={form.email}
+                    onChange={handleChange}
+                    required
+                    autoComplete="email"
+                  />
                 </div>
+              </div>
+
+              <div className="form-group">
+                <label>Nomor WhatsApp</label>
+                <div className="input-wrap">
+                  <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+                  </svg>
+                  <input
+                    type="tel"
+                    name="whatsapp"
+                    placeholder="0812xxxxxx"
+                    value={form.whatsapp}
+                    onChange={handleChange}
+                    required
+                    autoComplete="tel"
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Kata Sandi</label>
                 <div className="input-wrap">
                   <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
                   </svg>
                   <input
                     type={showPass ? "text" : "password"}
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    name="password"
+                    placeholder="Min. 6 karakter"
+                    value={form.password}
+                    onChange={handleChange}
                     required
-                    autoComplete="current-password"
+                    autoComplete="new-password"
                   />
                   <button type="button" className="toggle-pass" onClick={() => setShowPass(!showPass)}>
                     {showPass ? "🙈" : "👁️"}
@@ -364,13 +394,35 @@ export default function LoginPage() {
                 </div>
               </div>
 
+              <div className="form-group">
+                <label>Konfirmasi Kata Sandi</label>
+                <div className="input-wrap">
+                  <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                  </svg>
+                  <input
+                    type={showConfirmPass ? "text" : "password"}
+                    name="confirm"
+                    placeholder="Ulangi kata sandi"
+                    value={form.confirm}
+                    onChange={handleChange}
+                    required
+                    autoComplete="new-password"
+                    className={form.confirm && form.confirm !== form.password ? "input-error" : ""}
+                  />
+                  <button type="button" className="toggle-pass" onClick={() => setShowConfirmPass(!showConfirmPass)}>
+                    {showConfirmPass ? "🙈" : "👁️"}
+                  </button>
+                </div>
+              </div>
+
               <button type="submit" className="btn-submit" disabled={loading}>
-                {loading ? "Memverifikasi..." : "Masuk Sekarang →"}
+                {loading ? "Mendaftarkan..." : "Daftar Sekarang →"}
               </button>
             </form>
 
             <div className="card-footer">
-              Belum punya akun? <a href="/register">Daftar Sekarang</a>
+              Sudah punya akun? <a href="/login">Login Sekarang</a>
             </div>
           </div>
 

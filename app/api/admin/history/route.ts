@@ -21,7 +21,7 @@ export async function GET() {
   if (!profile || profile.role !== "admin") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  const { data: rows, error } = await supabase
+  const { data: rows, error: historyError } = await supabase
     .from("login_history")
     .select(
       `
@@ -38,12 +38,15 @@ export async function GET() {
     `
     )
     .order("created_at", { ascending: false })
-    .limit(20);
+    .limit(50);
 
-  if (error) {
-    console.error("[auth/history] Query error:", error.message);
+  if (historyError) {
+    console.error("[admin/history] Query error:", historyError.message);
     return NextResponse.json({ error: "Gagal mengambil histori." }, { status: 500 });
   }
+  const { count: totalUsers } = await supabase
+    .from("profiles")
+    .select("id", { count: "exact", head: true });
   const history: LoginEntry[] = (rows ?? []).map((row) => {
     const p = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
     return {
@@ -51,12 +54,12 @@ export async function GET() {
       userId: row.user_id ?? "-",
       email: p?.email ?? "-",
       name: p?.full_name ?? "-",
-      status: row.status as "success" | "failed",
+      status: row.status === "berhasil" ? "success" : "failed",
       ip: row.ip_address,
       userAgent: row.user_agent,
       timestamp: row.created_at,
     };
   });
 
-  return NextResponse.json({ history });
+  return NextResponse.json({ history, totalUsers: totalUsers ?? 0 });
 }
