@@ -59,10 +59,10 @@ const JURUSAN_LIST = [
     delay: "reveal-delay-1",
   },
   {
-    kode: "PHW",
+    kode: "PH",
     nama: "Perhotelan & Pariwisata",
     desc: "Siap berkarier di industri hospitality dengan pelatihan layanan hotel, front office, dan pariwisata.",
-    img: "/jurusan/phw.jpg",
+    img: "/jurusan/ph.jpg",
     delay: "reveal-delay-2",
   },
 ];
@@ -619,24 +619,24 @@ export default function LandingPage() {
             <div className="hero-right">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img className="hero-photo hero-photo-1"
-                src="https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=400&h=500&fit=crop&q=80"
-                alt="Siswa belajar" />
+                src="/jurusan/dkv.jpg"
+                alt="Siswa DKV" />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img className="hero-photo hero-photo-2"
-                src="https://images.unsplash.com/photo-1580582932707-520afc8711b3?w=400&h=400&fit=crop&q=80"
-                alt="Lab komputer" />
+                src="/jurusan/pplg.jpg"
+                alt="Siswa PPLG" />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img className="hero-photo hero-photo-3"
-                src="https://images.unsplash.com/photo-1571260899304-425eee4c7efc?w=400&h=500&fit=crop&q=80"
-                alt="Siswa di kelas" />
+                src="/jurusan/tkj.jpg"
+                alt="Siswa TKJ" />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img className="hero-photo hero-photo-4"
-                src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=500&h=400&fit=crop&q=80"
-                alt="Kerja tim" />
+                src="/jurusan/mplb.jpg"
+                alt="Siswa MPLB" />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img className="hero-photo hero-photo-5"
-                src="https://images.unsplash.com/photo-1560785496-3c9d5ec3cdf7?w=400&h=440&fit=crop&q=80"
-                alt="Siswa tersenyum" />
+                src="/jurusan/pm.jpeg"
+                alt="Siswa PM" />
 
               <div className="hero-badge-float">
                 <div className="dot">
@@ -735,8 +735,8 @@ export default function LandingPage() {
             <div className="challenges-right reveal">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img className="challenges-img"
-                src="https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=700&h=800&fit=crop&q=80"
-                alt="Siswa belajar" />
+                src="/jurusan/pplg.jpg"
+                alt="Siswa PPLG SMK Citra Negara" />
               <div className="stat-float">
                 <div className="big">98%</div>
                 <div className="lbl">Tingkat Keterserapan Kerja</div>

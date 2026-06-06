@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 
@@ -79,6 +80,7 @@ export default function LandingNavbar({ activePage }: LandingNavbarProps) {
         .ln-links {
           display: flex; align-items: center; gap: 32px;
           list-style: none; margin: 0; padding: 0;
+          flex: 1; justify-content: center;
         }
         .ln-links a {
           font-family: 'Plus Jakarta Sans', sans-serif;
@@ -141,8 +143,8 @@ export default function LandingNavbar({ activePage }: LandingNavbarProps) {
         <div className="ln-nav-inner">
           <Link href="/" className="ln-logo">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-smk.png" alt="Logo SMK Citra Negara" className="ln-logo-img"/>
-            SMK<span>Citra Negara</span>
+            <Image src="/logo-smk.png" alt="Logo SMK Citra Negara" width={38} height={38} style={{ objectFit: "contain", flexShrink: 0 }} />
+            SMK <span>Citra Negara</span>
           </Link>
           <ul className="ln-links">
             <li><Link href="/" className={activePage === "beranda" ? "active" : ""}>Beranda</Link></li>
@@ -181,14 +183,7 @@ export default function LandingNavbar({ activePage }: LandingNavbarProps) {
                       </div>
                       <div style={{ padding: "6px 0" }}>
                         <Link href="/hasil-seleksi" className="ln-dropdown-item">Hasil Seleksi</Link>
-                        <div className="ln-dropdown-item" style={{ color: "#9CA3AF", cursor: "not-allowed" }}>
-                          <span style={{ position: "relative" }}>
-                            💳
-                            <span style={{ position: "absolute", top: -4, right: -4, width: 8, height: 8, borderRadius: "50%", background: "#DC2626", border: "1.5px solid white" }} />
-                          </span>
-                          Pembayaran
-                          <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 600, background: "#FEF3C7", color: "#92400E", padding: "2px 6px", borderRadius: 9999 }}>Segera</span>
-                        </div>
+
                         <Link href={navUser.role === "admin" ? "/dashboard/profile" : "/pendaftaran"} className="ln-dropdown-item">
                           👤 {navUser.role === "admin" ? "Dashboard" : "Pendaftaran Saya"}
                         </Link>
@@ -202,7 +197,7 @@ export default function LandingNavbar({ activePage }: LandingNavbarProps) {
                             window.location.href = "/login";
                           }}
                         >
-                          🚪 Keluar
+                          Keluar
                         </button>
                       </div>
                     </div>
