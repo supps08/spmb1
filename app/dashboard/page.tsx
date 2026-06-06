@@ -1,12 +1,3 @@
-// ============================================================
-// STATUS : 🆕 BARU
-// PATH   : app/dashboard/page.tsx
-// ISI    : Halaman beranda dashboard
-//          - Welcome banner (greeting pagi/siang/malam)
-//          - 4 stat card: total user, total login, success rate, gagal
-//          - Tabel histori login terkini (15 baris)
-//          - Polling real-time setiap 15 detik + animasi pulse saat update
-// ============================================================
 
 "use client";
 
@@ -33,7 +24,7 @@ interface LoginEntry {
   userId: string;
   email: string;
   name: string;
-  status: "berhasil" | "gagal";
+  status: "success" | "failed";
   ip: string;
   userAgent: string;
   timestamp: string;
@@ -77,7 +68,7 @@ export default function DashboardPage() {
         const h: LoginEntry[] = d.history ?? [];
         setHistory(h);
         const total = h.length;
-        const failed = h.filter((e) => e.status === "gagal").length;
+        const failed = h.filter((e) => e.status === "failed").length;
         const success = total - failed;
         setStats({
           totalUsers: d.totalUsers ?? 1,
@@ -144,7 +135,7 @@ export default function DashboardPage() {
           font-family: 'Plus Jakarta Sans', sans-serif;
         }
 
-        /* Hero */
+        
         .hero-banner {
           position: relative;
           overflow: hidden;
@@ -203,7 +194,7 @@ export default function DashboardPage() {
           line-height: 1.5;
         }
 
-        /* Stats */
+        
         .stats-grid {
           display: grid;
           grid-template-columns: repeat(4, 1fr);
@@ -274,7 +265,7 @@ export default function DashboardPage() {
           margin-top: 6px;
         }
 
-        /* History panel */
+        
         .panel {
           background: #fff;
           border: 1px solid #E5E7EB;
@@ -631,9 +622,9 @@ export default function DashboardPage() {
                         </td>
                         <td>
                           <span
-                            className={`status-badge ${entry.status === "berhasil" ? "success" : "failed"}`}
+                            className={`status-badge ${entry.status === "success" ? "success" : "failed"}`}
                           >
-                            {entry.status === "berhasil"
+                            {entry.status === "success"
                               ? "BERHASIL"
                               : "GAGAL"}
                           </span>

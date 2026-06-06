@@ -1,7 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -10,8 +9,6 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
-
-  // Autocomplete email dari localStorage
   useEffect(() => {
     const saved = localStorage.getItem("spmb_last_email");
     if (saved) setEmail(saved);
@@ -32,9 +29,6 @@ export default function LoginPage() {
         setError(data.error || "Login gagal.");
       } else {
         localStorage.setItem("spmb_last_email", email);
-        // Redirect berdasarkan role:
-        // admin → /dashboard
-        // user biasa → /pendaftaran
         if (data.user?.role === "admin") {
           router.push("/dashboard");
         } else {
@@ -82,9 +76,12 @@ export default function LoginPage() {
         }
 
         .auth-bg {
-          position: fixed !important;
-          inset: 0 !important;
-          z-index: 0 !important;
+          position: fixed;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          z-index: 0;
         }
 
         .auth-content {
@@ -201,7 +198,7 @@ export default function LoginPage() {
         input[type="text"],
         input[type="tel"] {
           width: 100%;
-          padding: 13px 48px 13px 42px;
+          padding: 13px 44px 13px 42px;
           border: 1.5px solid var(--input-border);
           border-radius: 10px;
           font-family: 'Plus Jakarta Sans', sans-serif;
@@ -219,7 +216,7 @@ export default function LoginPage() {
 
         .toggle-pass {
           position: absolute;
-          right: 12px;
+          right: 14px;
           top: 50%;
           transform: translateY(-50%);
           background: none;
@@ -227,11 +224,8 @@ export default function LoginPage() {
           cursor: pointer;
           color: var(--text-dark);
           opacity: 0.5;
-          padding: 4px;
-          line-height: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
+          font-size: 18px;
+          padding: 2px;
           transition: opacity .2s;
         }
 
@@ -309,20 +303,16 @@ export default function LoginPage() {
       `}</style>
 
       <div className="auth-page">
-        <Image
+        <img
           className="auth-bg"
-          src="/sekolah/kegiatan.jpg"
+          src="https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=1600"
           alt=""
-          fill
-          priority
-          quality={85}
-          style={{ objectFit: "cover" }}
         />
 
         <div className="auth-content">
           <div className="auth-card">
             <div className="brand">
-              <Image src="/logo-smk.png" alt="Logo SMK Citra Negara" width={64} height={64} style={{ objectFit: "contain", marginBottom: 8, display: "block", margin: "0 auto 8px" }} priority />
+              <div className="brand-icon">🎓</div>
               <h1>Login Pendaftaran Citra Negara</h1>
               <p>Masuk ke portal pendaftaran Citra Negara untuk melanjutkan proses admisi Anda.</p>
             </div>
@@ -344,7 +334,7 @@ export default function LoginPage() {
                     type="text"
                     placeholder="email@spmb.com"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value.replace(/[^a-zA-Z0-9@._+-]/g, ""))}
+                    onChange={(e) => setEmail(e.target.value)}
                     required
                     autoComplete="username"
                   />
@@ -368,17 +358,8 @@ export default function LoginPage() {
                     required
                     autoComplete="current-password"
                   />
-                  <button type="button" className="toggle-pass" onClick={() => setShowPass(!showPass)} aria-label={showPass ? "Sembunyikan password" : "Tampilkan password"}>
-                    {showPass ? (
-                      <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
-                      </svg>
-                    ) : (
-                      <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                      </svg>
-                    )}
+                  <button type="button" className="toggle-pass" onClick={() => setShowPass(!showPass)}>
+                    {showPass ? "🙈" : "👁️"}
                   </button>
                 </div>
               </div>

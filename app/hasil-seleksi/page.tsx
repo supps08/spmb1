@@ -1,10 +1,3 @@
-// ============================================================
-// PATH   : app/hasil-seleksi/page.tsx
-// ISI    : Halaman publik cek status pendaftaran
-//          - Input NISN → cari di tabel siswa
-//          - Tampilkan status: diterima / ditolak / menunggu / submitted
-//          - Tampilkan detail data diri + jurusan
-// ============================================================
 
 "use client";
 

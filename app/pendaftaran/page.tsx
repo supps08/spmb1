@@ -1,9 +1,3 @@
-// ============================================================
-// PATH   : app/pendaftaran/page.tsx
-// ISI    : Formulir pendaftaran 5 tahap (calon siswa)
-//          - Data diri, akademik, orang tua, upload berkas, review
-//          - Simpan draft ke Supabase per tahap
-// ============================================================
 
 "use client";
 
@@ -312,7 +306,6 @@ export default function PendaftaranPage() {
           setKuotaData(Object.fromEntries(kuota.map((k) => [k.id, k])));
         }
       } catch {
-        // kuota opsional — card tetap tampil tanpa progress bar
       }
 
       setLoading(false);
@@ -322,7 +315,6 @@ export default function PendaftaranPage() {
   }, [supabase, router, showToast]);
 
   useEffect(() => {
-    // Aktifkan warning saat form sudah mulai diisi tapi belum submit
     const isDirty = step > 1 || Object.values(form).some(v =>
       typeof v === 'string' ? v.trim() !== '' : Boolean(v)
     );
@@ -411,7 +403,7 @@ export default function PendaftaranPage() {
       .upload(path, file, { upsert: true, contentType: file.type });
 
     if (upErr) {
-      throw new Error("Gagal upload " + key + ": " + upErr.message);
+      throw new Error(upErr.message);
     }
 
     const { data: publicData } = supabase.storage
@@ -473,14 +465,26 @@ export default function PendaftaranPage() {
         .eq("siswa_id", siswaId)
         .maybeSingle();
 
-      let result;
       if (existing) {
-        result = await supabase.from("ortu").update(ortuPayload).eq("siswa_id", siswaId);
-      } else {
-        result = await supabase.from("ortu").insert(ortuPayload);
-      }
+        const { error } = await supabase
+          .from("ortu")
+          .update(ortuPayload)
+          .eq("siswa_id", siswaId);
+        const { data: existing } = await supabase
+    .from("ortu").select("id").eq("siswa_id", siswaId).maybeSingle();
 
-      if (result.error) throw new Error(result.error.message);
+  let result;
+  if (existing) {
+    result = await supabase.from("ortu").update(ortuPayload).eq("siswa_id", siswaId);
+  } else {
+    result = await supabase.from("ortu").insert(ortuPayload);
+  }
+
+  if (result.error) {
+    showToast("Gagal menyimpan data orang tua: " + result.error.message, "error");
+    return; // ← jangan lanjut ke step berikutnya
+  }
+} 
 
       await supabase
         .from("siswa")
@@ -952,13 +956,6 @@ export default function PendaftaranPage() {
           border-style: solid;
           border-color: #EBF4EE;
           background: #F2F8F4;
-          min-height: 140px;
-          height: 140px;
-          overflow: hidden;
-          padding: 12px 16px;
-          flex-direction: row;
-          justify-content: flex-start;
-          text-align: left;
         }
 
         .upload-zone p {
@@ -1413,7 +1410,7 @@ export default function PendaftaranPage() {
                     id="nama_lengkap"
                     className="form-input"
                     value={form.nama_lengkap}
-                    onChange={(e) => updateField("nama_lengkap", e.target.value.replace(/[^a-zA-Z\s]/g, ""))}
+                    onChange={(e) => updateField("nama_lengkap", e.target.value)}
                     disabled={alreadySubmitted}
                   />
                 </div>
@@ -1423,7 +1420,7 @@ export default function PendaftaranPage() {
                     id="nama_panggilan"
                     className="form-input"
                     value={form.nama_panggilan}
-                    onChange={(e) => updateField("nama_panggilan", e.target.value.replace(/[^a-zA-Z\s]/g, ""))}
+                    onChange={(e) => updateField("nama_panggilan", e.target.value)}
                     disabled={alreadySubmitted}
                   />
                 </div>
@@ -1463,7 +1460,7 @@ export default function PendaftaranPage() {
                     id="tempat_lahir"
                     className="form-input"
                     value={form.tempat_lahir}
-                    onChange={(e) => updateField("tempat_lahir", e.target.value.replace(/[^a-zA-Z\s]/g, ""))}
+                    onChange={(e) => updateField("tempat_lahir", e.target.value)}
                     disabled={alreadySubmitted}
                   />
                 </div>
@@ -1597,9 +1594,8 @@ export default function PendaftaranPage() {
                 <input
                   id="no_pribadi"
                   className="form-input"
-                  inputMode="tel"
                   value={form.no_pribadi}
-                  onChange={(e) => updateField("no_pribadi", e.target.value.replace(/\D/g, ""))}
+                  onChange={(e) => updateField("no_pribadi", e.target.value)}
                   disabled={alreadySubmitted}
                 />
               </div>
@@ -1623,15 +1619,14 @@ export default function PendaftaranPage() {
                 <label htmlFor="nilai_rata_rata">Nilai Rata-rata Rapor *</label>
                 <input
                   id="nilai_rata_rata"
-                  type="text"
-                  inputMode="decimal"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={0.01}
                   className="form-input"
                   placeholder="Contoh: 85.50"
                   value={form.nilai_rata_rata}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (/^\d*\.?\d*$/.test(val)) updateField("nilai_rata_rata", val);
-                  }}
+                  onChange={(e) => updateField("nilai_rata_rata", e.target.value)}
                   disabled={alreadySubmitted}
                 />
               </div>
@@ -1660,7 +1655,7 @@ export default function PendaftaranPage() {
                     id="nama_ayah"
                     className="form-input"
                     value={form.nama_ayah}
-                    onChange={(e) => updateField("nama_ayah", e.target.value.replace(/[^a-zA-Z\s]/g, ""))}
+                    onChange={(e) => updateField("nama_ayah", e.target.value)}
                     disabled={alreadySubmitted}
                   />
                 </div>
@@ -1670,7 +1665,7 @@ export default function PendaftaranPage() {
                     id="nama_ibu"
                     className="form-input"
                     value={form.nama_ibu}
-                    onChange={(e) => updateField("nama_ibu", e.target.value.replace(/[^a-zA-Z\s]/g, ""))}
+                    onChange={(e) => updateField("nama_ibu", e.target.value)}
                     disabled={alreadySubmitted}
                   />
                 </div>
@@ -1682,7 +1677,7 @@ export default function PendaftaranPage() {
                     id="pekerjaan_ayah"
                     className="form-input"
                     value={form.pekerjaan_ayah}
-                    onChange={(e) => updateField("pekerjaan_ayah", e.target.value.replace(/[^a-zA-Z\s]/g, ""))}
+                    onChange={(e) => updateField("pekerjaan_ayah", e.target.value)}
                     disabled={alreadySubmitted}
                   />
                 </div>
@@ -1692,7 +1687,7 @@ export default function PendaftaranPage() {
                     id="pekerjaan_ibu"
                     className="form-input"
                     value={form.pekerjaan_ibu}
-                    onChange={(e) => updateField("pekerjaan_ibu", e.target.value.replace(/[^a-zA-Z\s]/g, ""))}
+                    onChange={(e) => updateField("pekerjaan_ibu", e.target.value)}
                     disabled={alreadySubmitted}
                   />
                 </div>
@@ -1703,10 +1698,10 @@ export default function PendaftaranPage() {
                   id="no_ortu"
                   className="form-input"
                   placeholder="Contoh: 08123456789"
-                  inputMode="tel"
                   value={form.no_ortu}
-                  onChange={(e) => updateField("no_ortu", e.target.value.replace(/\D/g, ""))}
+                  onChange={(e) => updateField("no_ortu", e.target.value)}
                   disabled={alreadySubmitted}
+                  inputMode="tel"
                 />
               </div>
             </>

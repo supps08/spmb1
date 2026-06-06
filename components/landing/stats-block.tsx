@@ -4,16 +4,20 @@ import { useState, useCallback, useEffect } from "react";
 
 const CAROUSEL_IMAGES = [
   {
-    alt: "Papan nama SMK Citra Negara",
-    src: "/sekolah/papan-nama.jpg",
+    alt: "Sertifikat",
+    src: "https://images.unsplash.com/photo-1588196749597-9ff075ee65b5?w=800&h=450&fit=crop&q=80",
   },
   {
-    alt: "Lapangan SMK Citra Negara",
-    src: "/sekolah/lapangan.jpg",
+    alt: "Beasiswa",
+    src: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=800&h=450&fit=crop&q=80",
   },
   {
-    alt: "Kegiatan siswa SMK Citra Negara",
-    src: "/sekolah/kegiatan.jpg",
+    alt: "Penghargaan",
+    src: "https://images.unsplash.com/photo-1567423508843-61f7a3393a0a?w=800&h=450&fit=crop&q=80",
+  },
+  {
+    alt: "Graduation",
+    src: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=800&h=450&fit=crop&q=80",
   },
 ];
 
@@ -70,7 +74,7 @@ export default function StatsBlock() {
 
           <div className="stats-carousel reveal">
             <div className="stats-carousel-frame">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {}
               <img
                 key={carouselIndex}
                 className="stats-carousel-img"

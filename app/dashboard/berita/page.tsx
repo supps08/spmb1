@@ -109,7 +109,7 @@ export default function DashboardBeritaPage() {
         }
       }
     } catch {
-      /* keep partial form */
+      
     }
   }
 
@@ -154,8 +154,6 @@ export default function DashboardBeritaPage() {
       }
 
       const resData = await res.json().catch(() => ({}));
-
-      // Kalau slug berubah (judul diedit), update editingSlug ke slug baru
       if (resData.slugChanged && resData.berita?.slug) {
         setEditingSlug(resData.berita.slug);
       }

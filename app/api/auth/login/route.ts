@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-
-// Rate limiter in-memory: max 5 percobaan per IP per 15 menit
 const loginAttempts = new Map<string, { count: number; resetAt: number }>();
 const MAX_ATTEMPTS = 5;
 const WINDOW_MS = 15 * 60 * 1000; // 15 menit
@@ -40,8 +38,6 @@ export async function POST(req: NextRequest) {
     req.headers.get("x-real-ip") ||
     "unknown";
   const userAgent = req.headers.get("user-agent") || "unknown";
-
-  // Cek rate limit
   const { blocked, retryAfter } = checkRateLimit(ip);
   if (blocked) {
     return NextResponse.json(
@@ -84,8 +80,6 @@ export async function POST(req: NextRequest) {
     user_agent: userAgent,
     status: "berhasil",
   });
-
-  // Reset rate limit setelah login berhasil
   resetRateLimit(ip);
 
   const { data: profile } = await supabase

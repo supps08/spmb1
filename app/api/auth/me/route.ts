@@ -1,7 +1,3 @@
-// ============================================================
-// PATH : app/api/auth/me/route.ts
-// ISI  : GET → kembalikan data user dari session Supabase + join profiles
-// ============================================================
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
@@ -17,8 +13,6 @@ export async function GET() {
   if (error || !user) {
     return NextResponse.json({ user: null }, { status: 401 });
   }
-
-  // Ambil profil lengkap
   const { data: profile } = await supabase
     .from("profiles")
     .select("full_name, role, created_at, avatar_url")

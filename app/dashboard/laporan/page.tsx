@@ -1,11 +1,3 @@
-// ============================================================
-// PATH   : app/dashboard/laporan/page.tsx
-// ISI    : Halaman Laporan Penerimaan
-//          - 4 stat cards (total, diterima, ditolak, menunggu)
-//          - Tabel rekap per jurusan + progress bar
-//          - Bar chart tren harian 7 hari (Recharts)
-//          - Info card penutupan pendaftaran
-// ============================================================
 
 "use client";
 

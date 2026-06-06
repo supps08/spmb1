@@ -79,12 +79,12 @@ create table public.siswa (
   jenis_kelamin     text check (jenis_kelamin in ('L', 'P')),
   agama             text,
   alamat_lengkap    text,
-  no_pribadi        text,             
+  no_pribadi        text,             -- nomor HP siswa sendiri
   asal_sekolah      text,
   nisn              text unique,
   nik               text unique,
 
-  
+  -- Metadata verifikasi (untuk admin)
   submitted_at      timestamptz,
   verified_at       timestamptz,
   verified_by       uuid references public.profiles(id),

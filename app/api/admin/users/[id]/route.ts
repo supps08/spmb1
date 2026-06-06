@@ -1,11 +1,3 @@
-// ============================================================
-// PATH : app/api/admin/users/[id]/route.ts
-// ISI  : GET    → detail user by ID (admin only)
-//        PUT    → update user di tabel profiles
-//                 (update password membutuhkan SUPABASE_SERVICE_ROLE_KEY)
-//        DELETE → hapus user dari profiles
-//                 (hapus dari auth.users membutuhkan SUPABASE_SERVICE_ROLE_KEY)
-// ============================================================
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
@@ -13,8 +5,6 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import type { PublicUser } from "@/lib/auth";
 
 type Params = { params: Promise<{ id: string }> };
-
-// ─── Helper: verifikasi admin & kembalikan user aktif ─────────
 async function requireAdmin() {
   const supabase = await createClient();
 
@@ -36,8 +26,6 @@ async function requireAdmin() {
 
   return { supabase, adminUser: user, error: null };
 }
-
-// ─── GET /api/admin/users/[id] ───────────────────────────────
 export async function GET(_req: NextRequest, { params }: Params) {
   const { supabase, error } = await requireAdmin();
 
@@ -71,8 +59,6 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
   return NextResponse.json({ user });
 }
-
-// ─── PUT /api/admin/users/[id] ───────────────────────────────
 export async function PUT(req: NextRequest, { params }: Params) {
   const { supabase, adminUser, error } = await requireAdmin();
 
@@ -97,8 +83,6 @@ export async function PUT(req: NextRequest, { params }: Params) {
     password?: string;
     is_active?: boolean;
   };
-
-  // Admin tidak bisa turunkan role diri sendiri
   if (adminUser!.id === id && role && role !== "admin") {
     return NextResponse.json(
       { error: "Tidak bisa menurunkan role akun sendiri." },
@@ -116,8 +100,6 @@ export async function PUT(req: NextRequest, { params }: Params) {
       { status: 400 }
     );
   }
-
-  // Update kolom profiles (name, email, role, is_active)
   const updates: Record<string, string | boolean> = {};
   if (name) updates.full_name = name.trim();
   if (email) updates.email = email.trim().toLowerCase();
@@ -140,13 +122,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: profileError.message }, { status: 500 });
     }
   }
-
-  // Update password jika diminta — butuh service role key
   if (password) {
-    // TODO: Tambahkan SUPABASE_SERVICE_ROLE_KEY ke .env.local untuk mengaktifkan
-    //       update password dari admin panel. Tanpa service role key, perubahan
-    //       password di sini tidak akan diterapkan ke Supabase Auth.
-    //
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (serviceRoleKey) {
       const adminClient = createSupabaseClient(
@@ -166,8 +142,6 @@ export async function PUT(req: NextRequest, { params }: Params) {
       );
     }
   }
-
-  // Ambil data terbaru
   const { data: updated } = await supabase
     .from("profiles")
     .select("id, full_name, email, role, is_active, created_at")
@@ -189,8 +163,6 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   return NextResponse.json({ user });
 }
-
-// ─── DELETE /api/admin/users/[id] ────────────────────────────
 export async function DELETE(_req: NextRequest, { params }: Params) {
   const { supabase, adminUser, error } = await requireAdmin();
 
@@ -202,16 +174,12 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   }
 
   const { id } = await params;
-
-  // Admin tidak bisa hapus dirinya sendiri
   if (adminUser!.id === id) {
     return NextResponse.json(
       { error: "Tidak bisa menghapus akun sendiri." },
       { status: 400 }
     );
   }
-
-  // Hapus dari tabel profiles
   const { error: profileError } = await supabase
     .from("profiles")
     .delete()
@@ -220,14 +188,6 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   if (profileError) {
     return NextResponse.json({ error: profileError.message }, { status: 500 });
   }
-
-  // TODO: Untuk menghapus user dari Supabase Auth (auth.users) juga,
-  //       tambahkan SUPABASE_SERVICE_ROLE_KEY ke .env.local dan gunakan:
-  //       adminClient.auth.admin.deleteUser(id)
-  //
-  //       Tanpa service role key, user tetap ada di auth.users tapi
-  //       profil sudah dihapus dari tabel profiles.
-  //
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (serviceRoleKey) {
     const adminClient = createSupabaseClient(
