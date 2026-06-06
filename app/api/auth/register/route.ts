@@ -7,11 +7,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const { name, email, password } = body as {
+  let body: { name?: string; email?: string; password?: string; phone?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Request tidak valid." }, { status: 400 });
+  }
+  const { name, email, password, phone } = body as {
     name?: string;
     email?: string;
     password?: string;
+    phone?: string;
   };
 
   if (!name || !email || !password) {
@@ -35,7 +41,7 @@ export async function POST(req: NextRequest) {
     email: email.trim().toLowerCase(),
     password,
     options: {
-      data: { full_name: name.trim() },
+      data: { full_name: name.trim(), phone: phone?.trim() ?? null },
     },
   });
 
@@ -55,19 +61,6 @@ export async function POST(req: NextRequest) {
       { error: "Registrasi gagal. Coba lagi." },
       { status: 500 }
     );
-  }
-
-  // Insert ke tabel profiles
-  const { error: profileError } = await supabase.from("profiles").insert({
-    id: data.user.id,
-    full_name: name.trim(),
-    email: email.trim().toLowerCase(),
-    role: "user",
-  });
-
-  if (profileError) {
-    // User sudah terbuat di Supabase Auth, tapi profiles gagal → log saja
-    console.error("[register] Gagal insert profiles:", profileError.message);
   }
 
   return NextResponse.json(

@@ -84,7 +84,12 @@ export async function PUT(req: NextRequest, { params }: Params) {
   }
 
   const { id } = await params;
-  const body = await req.json();
+  let body: { name?: string; email?: string; role?: string; password?: string; is_active?: boolean };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Request tidak valid." }, { status: 400 });
+  }
   const { name, email, role, password, is_active } = body as {
     name?: string;
     email?: string;

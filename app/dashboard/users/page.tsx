@@ -202,14 +202,12 @@ export default function UsersPage() {
     const supabase = createClient();
     const { data, error } = await supabase
       .from("siswa")
-      .select(
-        `
+      .select(`
         id, nama_lengkap, nisn, asal_sekolah, status,
         submitted_at, verified_at, catatan_verifikasi,
         jurusan (id, kode, nama),
-        profiles (email, avatar_url)
-      `
-      )
+        profiles!siswa_user_id_fkey (email, avatar_url)
+      `)
       .neq("status", "draft")
       .order("submitted_at", { ascending: false });
 
@@ -291,25 +289,27 @@ export default function UsersPage() {
         return false;
       }
       setSaving(true);
-      const supabase = createClient();
-      const { error } = await supabase
-        .from("siswa")
-        .update({
+      try {
+        const supabase = createClient();
+        const { error } = await supabase.from("siswa").update({
           status: newStatus,
+          catatan_verifikasi: catatan,
           verified_at: new Date().toISOString(),
           verified_by: currentUserId,
-          catatan_verifikasi: catatan.trim() || null,
-        })
-        .eq("id", siswaId);
-
-      setSaving(false);
-      if (error) {
-        showToast("Gagal menyimpan keputusan verifikasi.", "error");
+        }).eq("id", siswaId);
+        if (error) {
+          showToast("Gagal menyimpan keputusan verifikasi.", "error");
+          return false;
+        }
+        await fetchPendaftar();
+        showToast("Keputusan verifikasi berhasil disimpan.");
+        return true;
+      } catch {
+        showToast("Koneksi gagal. Coba lagi.", "error");
         return false;
+      } finally {
+        setSaving(false);
       }
-      await fetchPendaftar();
-      showToast("Keputusan verifikasi berhasil disimpan.");
-      return true;
     },
     [currentUserId, fetchPendaftar, showToast]
   );

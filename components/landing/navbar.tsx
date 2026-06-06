@@ -72,8 +72,10 @@ export default function LandingNavbar({ activePage }: LandingNavbarProps) {
           font-family: 'Bricolage Grotesque', sans-serif;
           font-size: 1.1rem; font-weight: 800;
           color: #0C0C0C; text-decoration: none; flex-shrink: 0;
+          display: flex; align-items: center; gap: 10px;
         }
         .ln-logo span { color: #1C5C38; }
+        .ln-logo-img { width: 38px; height: 38px; object-fit: contain; flex-shrink: 0; }
         .ln-links {
           display: flex; align-items: center; gap: 32px;
           list-style: none; margin: 0; padding: 0;
@@ -138,14 +140,15 @@ export default function LandingNavbar({ activePage }: LandingNavbarProps) {
       <nav className={`ln-nav${scrolled ? " scrolled" : ""}`}>
         <div className="ln-nav-inner">
           <Link href="/" className="ln-logo">
-            SMK <span>Citra Negara</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-smk.png" alt="Logo SMK Citra Negara" className="ln-logo-img"/>
+            SMK<span>Citra Negara</span>
           </Link>
           <ul className="ln-links">
             <li><Link href="/" className={activePage === "beranda" ? "active" : ""}>Beranda</Link></li>
             <li><Link href="/#jurusan">Jurusan</Link></li>
             <li><Link href="/berita" className={activePage === "berita" ? "active" : ""}>Berita</Link></li>
             <li><Link href="/pendaftaran" className={activePage === "pendaftaran" ? "active" : ""}>Pendaftaran</Link></li>
-            <li><Link href="/hasil-seleksi" className={activePage === "hasil-seleksi" ? "active" : ""}>Hasil Seleksi</Link></li>
           </ul>
           <div style={{ position: "relative", flexShrink: 0 }}>
             {navUser ? (
@@ -177,7 +180,7 @@ export default function LandingNavbar({ activePage }: LandingNavbarProps) {
                         </div>
                       </div>
                       <div style={{ padding: "6px 0" }}>
-                        <Link href="/hasil-seleksi" className="ln-dropdown-item">🔍 Hasil Seleksi</Link>
+                        <Link href="/hasil-seleksi" className="ln-dropdown-item">Hasil Seleksi</Link>
                         <div className="ln-dropdown-item" style={{ color: "#9CA3AF", cursor: "not-allowed" }}>
                           <span style={{ position: "relative" }}>
                             💳

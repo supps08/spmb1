@@ -86,7 +86,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notifOpen, setNotifOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const notifRef = useRef<HTMLDivElement>(null);
+  const [userLoaded, setUserLoaded] = useState(false);
+const notifRef = useRef<HTMLDivElement>(null);
 
   const unread = notifications.filter((n) => !n.read).length;
 
@@ -98,6 +99,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
     const data = await res.json();
     setUser(data.user);
+    setUserLoaded(true);
   }, [router]);
 
   // TODO: aktifkan setelah /api/notifications dibuat
@@ -167,7 +169,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   const pageTitle = navLinks.find((l) => l.href === pathname)?.label ?? "Dashboard";
-  const visibleNav = navLinks.filter((l) => !l.adminOnly || user?.role === "admin");
+  const visibleNav = !userLoaded
+    ? navLinks
+    : navLinks.filter((l) => !l.adminOnly || user?.role === "admin");
 
   return (
     <>

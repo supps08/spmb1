@@ -812,7 +812,7 @@ export default function HasilSeleksiPage() {
               </div>
             </div>
 
-            {hasil.catatan_verifikasi && (
+            {hasil.catatan_verifikasi && hasil.status === "ditolak" && (
               <div className="catatan-box">
                 <strong>Catatan dari Tim Verifikasi:</strong>
                 {hasil.catatan_verifikasi}

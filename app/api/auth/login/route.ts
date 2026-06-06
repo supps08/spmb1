@@ -1,14 +1,54 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+// Rate limiter in-memory: max 5 percobaan per IP per 15 menit
+const loginAttempts = new Map<string, { count: number; resetAt: number }>();
+const MAX_ATTEMPTS = 5;
+const WINDOW_MS = 15 * 60 * 1000; // 15 menit
+
+function checkRateLimit(ip: string): { blocked: boolean; retryAfter?: number } {
+  const now = Date.now();
+  const record = loginAttempts.get(ip);
+
+  if (!record || now > record.resetAt) {
+    loginAttempts.set(ip, { count: 1, resetAt: now + WINDOW_MS });
+    return { blocked: false };
+  }
+
+  if (record.count >= MAX_ATTEMPTS) {
+    return { blocked: true, retryAfter: Math.ceil((record.resetAt - now) / 1000) };
+  }
+
+  record.count++;
+  return { blocked: false };
+}
+
+function resetRateLimit(ip: string) {
+  loginAttempts.delete(ip);
+}
+
 export async function POST(req: NextRequest) {
-  const { email, password } = await req.json();
+  let email: string, password: string;
+  try {
+    ({ email, password } = await req.json());
+  } catch {
+    return NextResponse.json({ error: "Request tidak valid." }, { status: 400 });
+  }
 
   const ip =
-    req.headers.get("x-forwarded-for") ||
+    req.headers.get("x-forwarded-for")?.split(",")[0].trim() ||
     req.headers.get("x-real-ip") ||
     "unknown";
   const userAgent = req.headers.get("user-agent") || "unknown";
+
+  // Cek rate limit
+  const { blocked, retryAfter } = checkRateLimit(ip);
+  if (blocked) {
+    return NextResponse.json(
+      { error: `Terlalu banyak percobaan. Coba lagi dalam ${retryAfter} detik.` },
+      { status: 429 }
+    );
+  }
 
   if (!email || !password) {
     return NextResponse.json(
@@ -44,6 +84,9 @@ export async function POST(req: NextRequest) {
     user_agent: userAgent,
     status: "berhasil",
   });
+
+  // Reset rate limit setelah login berhasil
+  resetRateLimit(ip);
 
   const { data: profile } = await supabase
     .from("profiles")

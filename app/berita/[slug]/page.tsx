@@ -171,6 +171,7 @@ function DetailStyles() {
         max-width: 720px;
         margin: 0 auto;
         padding: 100px 24px 80px;
+        text-align: left;
       }
 
       .berita-detail-loading,
@@ -269,6 +270,33 @@ function DetailStyles() {
       }
 
       .berita-detail-back:hover { text-decoration: underline; }
+
+      @media (max-width: 768px) {
+        .berita-detail-wrap {
+          padding: 80px 16px 60px;
+        }
+        .berita-detail-title {
+          font-size: 26px;
+        }
+        .berita-detail-prose p {
+          font-size: 14px;
+        }
+        .berita-detail-prose h2 {
+          font-size: 18px;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .berita-detail-wrap {
+          padding: 72px 12px 48px;
+        }
+        .berita-detail-title {
+          font-size: 22px;
+        }
+        .berita-detail-thumb {
+          max-height: 220px;
+        }
+      }
     `}</style>
   );
 }

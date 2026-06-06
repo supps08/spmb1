@@ -59,6 +59,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [lastUpdatedStr, setLastUpdatedStr] = useState("");
   const [pulse, setPulse] = useState(false);
 
   const fetchAll = useCallback(async () => {
@@ -98,6 +99,10 @@ export default function DashboardPage() {
     const interval = setInterval(fetchAll, 15000);
     return () => clearInterval(interval);
   }, [fetchAll]);
+
+  useEffect(() => {
+    setLastUpdatedStr(lastUpdated.toLocaleTimeString("id-ID"));
+  }, [lastUpdated]);
 
   function timeAgo(ts: string) {
     const diff = Date.now() - new Date(ts).getTime();
@@ -562,7 +567,7 @@ export default function DashboardPage() {
             <h3>Histori Login Terkini</h3>
             <span className="live-badge">
               <span className="live-dot" aria-hidden="true" />
-              LIVE · {typeof window !== "undefined" ? lastUpdated.toLocaleTimeString("id-ID") : ""}
+              LIVE · {lastUpdatedStr}
             </span>
           </div>
 

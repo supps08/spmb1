@@ -235,6 +235,30 @@ export default function JurusanDetailPage() {
           background: #1C5C38;
           color: #fff;
           padding: calc(68px + 80px) 0 80px;
+          position: relative;
+          overflow: hidden;
+        }
+        .jd-hero-inner {
+          display: flex;
+          align-items: center;
+          gap: 48px;
+        }
+        .jd-hero-content { flex: 1; }
+        .jd-hero-photo {
+          width: 340px; flex-shrink: 0;
+          border-radius: 16px;
+          overflow: hidden;
+          box-shadow: 0 16px 48px rgba(0,0,0,0.3);
+        }
+        .jd-hero-photo img {
+          width: 100%; height: 420px;
+          object-fit: cover; object-position: top;
+          display: block;
+        }
+        @media (max-width: 768px) {
+          .jd-hero-inner { flex-direction: column; }
+          .jd-hero-photo { width: 100%; }
+          .jd-hero-photo img { height: 260px; }
         }
         .jd-hero-badge {
           display: inline-block;
@@ -467,29 +491,42 @@ export default function JurusanDetailPage() {
           <>
             <section className="jd-hero">
               <div className="jd-container">
-                <div className="jd-hero-badge">{jurusan.kode}</div>
-                <h1>{jurusan.nama}</h1>
-                <p className="jd-hero-desc">
-                  {jurusan.deskripsi ||
-                    "Program kejuruan unggulan SMK Citra Negara untuk masa depan karier Anda."}
-                </p>
-                <div className="jd-hero-stats">
-                  <div>
-                    <div className="jd-hero-stat-val">{totalPendaftar}</div>
-                    <div className="jd-hero-stat-lbl">Total Pendaftar</div>
+                <div className="jd-hero-inner">
+                  <div className="jd-hero-content">
+                    <div className="jd-hero-badge">{jurusan.kode}</div>
+                    <h1>{jurusan.nama}</h1>
+                    <p className="jd-hero-desc">
+                      {jurusan.deskripsi ||
+                        "Program kejuruan unggulan SMK Citra Negara untuk masa depan karier Anda."}
+                    </p>
+                    <div className="jd-hero-stats">
+                      <div>
+                        <div className="jd-hero-stat-val">{totalPendaftar}</div>
+                        <div className="jd-hero-stat-lbl">Total Pendaftar</div>
+                      </div>
+                      <div>
+                        <div className="jd-hero-stat-val">{diterima}</div>
+                        <div className="jd-hero-stat-lbl">Diterima</div>
+                      </div>
+                      <div>
+                        <div className="jd-hero-stat-val">{sisaKuota}</div>
+                        <div className="jd-hero-stat-lbl">Kuota Tersisa</div>
+                      </div>
+                    </div>
+                    <Link href="/register" className="jd-btn-white">
+                      Daftar Sekarang →
+                    </Link>
                   </div>
-                  <div>
-                    <div className="jd-hero-stat-val">{diterima}</div>
-                    <div className="jd-hero-stat-lbl">Diterima</div>
-                  </div>
-                  <div>
-                    <div className="jd-hero-stat-val">{sisaKuota}</div>
-                    <div className="jd-hero-stat-lbl">Kuota Tersisa</div>
-                  </div>
+                  {({"DKV":"/jurusan/dkv.jpg","TKJ":"/jurusan/tkj.jpg","PPLG":"/jurusan/pplg.jpg","PHW":"/jurusan/phw.jpg","MPLB":"/jurusan/mplb.jpg", "PM":"/jurusan/pm.jpg"} as Record<string,string>)[jurusan.kode] && (
+                    <div className="jd-hero-photo">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={({"DKV":"/jurusan/dkv.jpg","TKJ":"/jurusan/tkj.jpg","PPLG":"/jurusan/pplg.jpg","PHW":"/jurusan/phw.jpg","MPLB":"/jurusan/mplb.jpg"} as Record<string,string>)[jurusan.kode]}
+                        alt={`Siswa ${jurusan.kode} SMK Citra Negara`}
+                      />
+                    </div>
+                  )}
                 </div>
-                <Link href="/register" className="jd-btn-white">
-                  Daftar Sekarang →
-                </Link>
               </div>
             </section>
 
