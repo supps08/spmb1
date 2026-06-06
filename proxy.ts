@@ -72,7 +72,7 @@ export async function proxy(request: NextRequest) {
       .single();
 
     if (!profile || profile.role !== "admin") {
-      // User biasa coba akses dashboard → redirect ke /pendaftaran
+      
       if (pathname.startsWith("/api")) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }

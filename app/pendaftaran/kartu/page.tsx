@@ -1,6 +1,6 @@
 // ============================================================
 // PATH   : app/pendaftaran/kartu/page.tsx
-// ISI    : Kartu pendaftaran — cetak & download PDF
+// ISI    : Kartu status pendaftaran (versi sederhana)
 //          Akses: login + status siswa !== 'draft'
 // ============================================================
 
@@ -8,9 +8,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { QRCodeSVG } from "qrcode.react";
-import html2canvas from "html2canvas";
-import { jsPDF } from "jspdf";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useScrollAnimation } from "@/lib/useScrollAnimation";
 
@@ -19,28 +17,13 @@ interface JurusanInfo {
   kode: string;
 }
 
-interface BerkasInfo {
-  foto_url: string | null;
-}
-
 interface SiswaKartu {
   nama_lengkap: string | null;
   nisn: string | null;
   asal_sekolah: string | null;
   submitted_at: string | null;
   status: string;
-  jurusan: JurusanInfo | null;
-  berkas: BerkasInfo | BerkasInfo[] | null;
-}
-
-function getInitials(name: string | null | undefined): string {
-  if (!name?.trim()) return "?";
-  return name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? "")
-    .join("");
+  jurusan: JurusanInfo | JurusanInfo[] | null;
 }
 
 function formatNomorPendaftaran(nisn: string | null, submittedAt: string | null): string {
@@ -55,41 +38,33 @@ function formatNomorPendaftaran(nisn: string | null, submittedAt: string | null)
 function formatTanggalDaftar(submittedAt: string | null): string {
   if (!submittedAt) return "—";
   return new Date(submittedAt).toLocaleDateString("id-ID", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
+    day: "numeric", month: "long", year: "numeric",
   });
 }
 
-function resolveFotoUrl(berkas: SiswaKartu["berkas"]): string | null {
-  if (!berkas) return null;
-  if (Array.isArray(berkas)) return berkas[0]?.foto_url ?? null;
-  return berkas.foto_url;
-}
+const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; desc: string }> = {
+  submitted:  { label: "Dikirim",   color: "#2563EB", bg: "#EFF6FF", desc: "Pendaftaranmu sudah diterima dan sedang menunggu verifikasi." },
+  menunggu:   { label: "Menunggu",  color: "#D97706", bg: "#FEF3C7", desc: "Berkasmu sedang dalam proses verifikasi oleh tim kami." },
+  diterima:   { label: "Diterima",  color: "#16A34A", bg: "#DCFCE7", desc: "Selamat! Kamu diterima di SMK Citra Negara." },
+  ditolak:    { label: "Ditolak",   color: "#DC2626", bg: "#FEE2E2", desc: "Maaf, pendaftaranmu tidak dapat diterima." },
+};
 
 export default function KartuPendaftaranPage() {
   const router = useRouter();
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
-  const [downloading, setDownloading] = useState(false);
   const [siswa, setSiswa] = useState<SiswaKartu | null>(null);
 
   useScrollAnimation();
 
   useEffect(() => {
     async function load() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        router.replace("/pendaftaran");
-        return;
-      }
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.replace("/pendaftaran"); return; }
 
       const { data, error } = await supabase
         .from("siswa")
-        .select("*, jurusan(nama, kode), berkas(foto_url)")
+        .select("nama_lengkap, nisn, asal_sekolah, submitted_at, status, jurusan(nama, kode)")
         .eq("user_id", user.id)
         .single();
 
@@ -101,7 +76,6 @@ export default function KartuPendaftaranPage() {
       setSiswa(data as SiswaKartu);
       setLoading(false);
     }
-
     load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
@@ -113,378 +87,191 @@ export default function KartuPendaftaranPage() {
 
   const jurusanLabel = useMemo(() => {
     if (!siswa?.jurusan) return "—";
-    return `${siswa.jurusan.kode} — ${siswa.jurusan.nama}`;
+    const j = Array.isArray(siswa.jurusan) ? siswa.jurusan[0] : siswa.jurusan;
+    if (!j) return "—";
+    return `${j.kode} — ${j.nama}`;
   }, [siswa]);
-
-  const qrValue = useMemo(() => {
-    if (!siswa) return "";
-    return JSON.stringify({
-      nisn: siswa.nisn ?? "",
-      nama: siswa.nama_lengkap ?? "",
-      jurusan: jurusanLabel,
-      tanggal_daftar: siswa.submitted_at ?? "",
-    });
-  }, [siswa, jurusanLabel]);
-
-  const fotoUrl = resolveFotoUrl(siswa?.berkas ?? null);
-
-  function handlePrint() {
-    window.print();
-  }
-
-  async function handleDownloadPdf() {
-    const card = document.querySelector(".print-card") as HTMLElement | null;
-    if (!card) return;
-
-    setDownloading(true);
-    try {
-      const canvas = await html2canvas(card, {
-        useCORS: true,
-        background: "#ffffff",
-      });
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const margin = 15;
-      const imgWidth = pageWidth - margin * 2;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      pdf.addImage(imgData, "PNG", margin, 20, imgWidth, imgHeight);
-      pdf.save("kartu-pendaftaran.pdf");
-    } finally {
-      setDownloading(false);
-    }
-  }
 
   if (loading) {
     return (
-      <>
-        <style>{`
-          .kartu-loading {
-            text-align: center;
-            padding: 80px 24px;
-            color: #6B7280;
-            font-size: 0.95rem;
-          }
-        `}</style>
-        <div className="kartu-loading no-print">Memuat kartu pendaftaran...</div>
-      </>
+      <div style={{ textAlign: "center", padding: "80px 24px", color: "#6B7280" }}>
+        Memuat status pendaftaran...
+      </div>
     );
   }
 
   if (!siswa) return null;
 
+  const statusCfg = STATUS_CONFIG[siswa.status] ?? STATUS_CONFIG.submitted;
+
   return (
     <>
       <style>{`
-        .kartu-page-header {
+        .kartu-wrap {
+          max-width: 540px;
+          margin: 0 auto;
+        }
+        .kartu-header {
           text-align: center;
-          margin-bottom: 32px;
+          margin-bottom: 28px;
         }
-        .kartu-page-header h1 {
+        .kartu-header h1 {
           font-family: 'Bricolage Grotesque', sans-serif;
-          font-size: 2rem;
-          font-weight: 800;
-          color: #0C0C0C;
-          letter-spacing: -0.03em;
-          margin-bottom: 8px;
+          font-size: 1.8rem; font-weight: 800;
+          color: #0C0C0C; letter-spacing: -0.03em;
+          margin-bottom: 6px;
         }
-        .kartu-page-header p {
-          font-size: 0.92rem;
-          color: #6B7280;
-          line-height: 1.6;
+        .kartu-header p {
+          font-size: 0.9rem; color: #6B7280;
         }
-
-        .kartu-actions {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 12px;
-          justify-content: center;
-          margin-bottom: 32px;
+        .kartu-status-box {
+          border-radius: 12px;
+          padding: 16px 20px;
+          margin-bottom: 20px;
+          display: flex; align-items: flex-start; gap: 12px;
         }
-        .kartu-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          padding: 12px 22px;
-          border-radius: 10px;
-          font-family: inherit;
-          font-size: 0.9rem;
-          font-weight: 600;
-          cursor: pointer;
-          transition: background 0.2s, border-color 0.2s, color 0.2s;
+        .kartu-status-label {
+          font-size: 0.75rem; font-weight: 700;
+          text-transform: uppercase; letter-spacing: 0.05em;
+          margin-bottom: 4px;
         }
-        .kartu-btn-primary {
-          background: #1C5C38;
-          color: #fff;
-          border: 2px solid #1C5C38;
+        .kartu-status-desc {
+          font-size: 0.88rem; line-height: 1.5;
         }
-        .kartu-btn-primary:hover:not(:disabled) {
-          background: #2A7A4E;
-          border-color: #2A7A4E;
-        }
-        .kartu-btn-outline {
+        .kartu-card {
           background: #fff;
-          color: #1C5C38;
-          border: 2px solid #1C5C38;
-        }
-        .kartu-btn-outline:hover:not(:disabled) {
-          background: #F2F8F4;
-        }
-        .kartu-btn:disabled {
-          opacity: 0.65;
-          cursor: not-allowed;
-        }
-
-        .print-card-wrap {
-          display: flex;
-          justify-content: center;
-          margin-bottom: 24px;
-        }
-
-        .print-card {
-          width: 100%;
-          max-width: 600px;
-          border: 2px solid #1C5C38;
-          border-radius: 16px;
+          border: 1.5px solid #E5E7EB;
+          border-radius: 14px;
           overflow: hidden;
-          background: #fff;
-          box-shadow: 0 4px 24px rgba(28, 92, 56, 0.08);
+          margin-bottom: 20px;
         }
-
-        .print-card-header {
+        .kartu-card-header {
           background: #1C5C38;
-          padding: 20px 24px;
-          display: flex;
-          align-items: center;
-          gap: 14px;
+          padding: 16px 20px;
         }
-        .print-card-logo {
-          width: 48px;
-          height: 48px;
-          border-radius: 50%;
-          background: rgba(255, 255, 255, 0.15);
-          border: 2px solid rgba(255, 255, 255, 0.35);
-          display: flex;
-          align-items: center;
-          justify-content: center;
+        .kartu-card-header h2 {
           font-family: 'Bricolage Grotesque', sans-serif;
-          font-weight: 800;
-          font-size: 1.1rem;
-          color: #fff;
-          flex-shrink: 0;
-        }
-        .print-card-header-text h2 {
-          font-family: 'Bricolage Grotesque', sans-serif;
-          font-size: 1.05rem;
-          font-weight: 800;
-          color: #fff;
-          letter-spacing: 0.04em;
+          font-size: 1rem; font-weight: 800;
+          color: #fff; letter-spacing: 0.04em;
           margin-bottom: 2px;
         }
-        .print-card-header-text p {
-          font-size: 0.72rem;
-          font-weight: 600;
-          color: rgba(255, 255, 255, 0.75);
-          letter-spacing: 0.06em;
-          text-transform: uppercase;
+        .kartu-card-header p {
+          font-size: 0.72rem; font-weight: 600;
+          color: rgba(255,255,255,0.7);
+          text-transform: uppercase; letter-spacing: 0.06em;
         }
-
-        .print-card-body {
-          padding: 24px;
-          display: grid;
-          grid-template-columns: 140px 1fr;
-          gap: 24px;
-          align-items: start;
+        .kartu-nomor {
+          padding: 16px 20px;
+          border-bottom: 1px solid #F3F4F6;
+          background: #F9FAFB;
         }
-
-        .print-card-left {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
+        .kartu-nomor dt {
+          font-size: 0.7rem; font-weight: 600;
+          color: #6B7280; text-transform: uppercase;
+          letter-spacing: 0.05em; margin-bottom: 4px;
+        }
+        .kartu-nomor dd {
+          font-family: 'Bricolage Grotesque', sans-serif;
+          font-size: 1.2rem; font-weight: 800; color: #1C5C38;
+        }
+        .kartu-fields {
+          padding: 16px 20px;
+          display: grid; grid-template-columns: 1fr 1fr;
           gap: 16px;
         }
-        .print-card-photo {
-          width: 100px;
-          height: 120px;
-          border-radius: 10px;
-          border: 2px solid #E5E7EB;
-          object-fit: cover;
-          background: #F2F8F4;
+        .kartu-field dt {
+          font-size: 0.7rem; font-weight: 600;
+          color: #6B7280; text-transform: uppercase;
+          letter-spacing: 0.05em; margin-bottom: 3px;
         }
-        .print-card-avatar {
-          width: 100px;
-          height: 120px;
-          border-radius: 10px;
-          border: 2px solid #E5E7EB;
-          background: #EBF4EE;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-family: 'Bricolage Grotesque', sans-serif;
-          font-size: 2rem;
-          font-weight: 800;
-          color: #1C5C38;
+        .kartu-field dd {
+          font-size: 0.9rem; font-weight: 600; color: #0C0C0C;
         }
-        .print-card-qr {
-          padding: 6px;
-          background: #fff;
-          border: 1px solid #E5E7EB;
-          border-radius: 8px;
-        }
-
-        .print-card-data {
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-        .print-card-field dt {
-          font-size: 0.68rem;
-          font-weight: 600;
-          color: #6B7280;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-          margin-bottom: 2px;
-        }
-        .print-card-field dd {
-          font-size: 0.92rem;
-          font-weight: 600;
-          color: #0C0C0C;
-          line-height: 1.4;
-        }
-        .print-card-field.highlight dd {
-          font-family: 'Bricolage Grotesque', sans-serif;
-          font-size: 1rem;
-          font-weight: 800;
-          color: #1C5C38;
-        }
-
-        .print-card-footer {
-          background: #F2F8F4;
-          padding: 12px 24px;
-          font-size: 11px;
-          color: #6B7280;
+        .kartu-card-footer {
+          padding: 10px 20px;
+          background: #F9FAFB;
+          border-top: 1px solid #F3F4F6;
+          font-size: 11px; color: #9CA3AF;
           text-align: center;
-          line-height: 1.5;
-          border-top: 1px solid #E5E7EB;
         }
-
-        @media (max-width: 520px) {
-          .print-card-body {
-            grid-template-columns: 1fr;
-            justify-items: center;
-            text-align: center;
-          }
-          .print-card-data {
-            width: 100%;
-          }
+        .kartu-back {
+          display: block; text-align: center;
+          font-size: 0.88rem; color: #1C5C38;
+          font-weight: 600; text-decoration: none;
         }
-
-        @media print {
-          .no-print {
-            display: none !important;
-          }
-          body {
-            background: #fff !important;
-          }
-          .pend-main {
-            padding: 0 !important;
-            max-width: none !important;
-          }
-          .pend-navbar,
-          footer {
-            display: none !important;
-          }
-          .print-card {
-            box-shadow: none !important;
-            max-width: 100% !important;
-            page-break-inside: avoid;
-          }
-          .print-card-wrap {
-            margin: 0 !important;
-          }
+        .kartu-back:hover { text-decoration: underline; }
+        @media (max-width: 480px) {
+          .kartu-fields { grid-template-columns: 1fr; }
         }
       `}</style>
 
-      <div className="kartu-page-header no-print" data-animate data-delay="0">
-        <h1>Kartu Pendaftaran</h1>
-        <p>Simpan atau cetak kartu ini sebagai bukti pendaftaran Anda</p>
-      </div>
+      <div className="kartu-wrap">
+        <div className="kartu-header" data-animate data-delay="0">
+          <h1>Status Pendaftaran</h1>
+          <p>Bukti pendaftaran SMK Citra Negara 2025/2026</p>
+        </div>
 
-      <div className="kartu-actions no-print" data-animate data-delay="50">
-        <button type="button" className="kartu-btn kartu-btn-primary" onClick={handlePrint}>
-          🖨 Cetak Kartu
-        </button>
-        <button
-          type="button"
-          className="kartu-btn kartu-btn-outline"
-          onClick={handleDownloadPdf}
-          disabled={downloading}
+        <div
+          className="kartu-status-box"
+          style={{ background: statusCfg.bg }}
+          data-animate data-delay="50"
         >
-          ⬇ {downloading ? "Menyiapkan PDF..." : "Download PDF"}
-        </button>
-      </div>
-
-      <div className="print-card-wrap" data-animate data-delay="100">
-        <article className="print-card">
-          <header className="print-card-header">
-            <div className="print-card-logo">S</div>
-            <div className="print-card-header-text">
-              <h2>SMK CITRA NEGARA</h2>
-              <p>Kartu Pendaftaran 2025/2026</p>
+          <div>
+            <div className="kartu-status-label" style={{ color: statusCfg.color }}>
+              {statusCfg.label}
             </div>
-          </header>
-
-          <div className="print-card-body">
-            <div className="print-card-left">
-              {fotoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={fotoUrl}
-                  alt={`Foto ${siswa.nama_lengkap ?? "siswa"}`}
-                  className="print-card-photo"
-                  crossOrigin="anonymous"
-                />
-              ) : (
-                <div className="print-card-avatar">{getInitials(siswa.nama_lengkap)}</div>
-              )}
-              <div className="print-card-qr">
-                <QRCodeSVG value={qrValue} size={80} level="M" />
-              </div>
+            <div className="kartu-status-desc" style={{ color: statusCfg.color }}>
+              {statusCfg.desc}
             </div>
+          </div>
+        </div>
 
-            <dl className="print-card-data">
-              <div className="print-card-field highlight">
-                <dt>Nomor Pendaftaran</dt>
-                <dd>{nomorPendaftaran}</dd>
-              </div>
-              <div className="print-card-field">
-                <dt>Nama Lengkap</dt>
-                <dd>{siswa.nama_lengkap || "—"}</dd>
-              </div>
-              <div className="print-card-field">
-                <dt>NISN</dt>
-                <dd>{siswa.nisn || "—"}</dd>
-              </div>
-              <div className="print-card-field">
-                <dt>Jurusan</dt>
-                <dd>{jurusanLabel}</dd>
-              </div>
-              <div className="print-card-field">
-                <dt>Asal Sekolah</dt>
-                <dd>{siswa.asal_sekolah || "—"}</dd>
-              </div>
-              <div className="print-card-field">
-                <dt>Tanggal Daftar</dt>
-                <dd>{formatTanggalDaftar(siswa.submitted_at)}</dd>
-              </div>
+        <div className="kartu-card" data-animate data-delay="100">
+          <div className="kartu-card-header">
+            <h2>SMK CITRA NEGARA</h2>
+            <p>Kartu Pendaftaran 2025/2026</p>
+          </div>
+
+          <dl className="kartu-nomor">
+            <dt>Nomor Pendaftaran</dt>
+            <dd>{nomorPendaftaran}</dd>
+          </dl>
+
+          <div className="kartu-fields">
+            <dl className="kartu-field">
+              <dt>Nama Lengkap</dt>
+              <dd>{siswa.nama_lengkap || "—"}</dd>
+            </dl>
+            <dl className="kartu-field">
+              <dt>NISN</dt>
+              <dd>{siswa.nisn || "—"}</dd>
+            </dl>
+            <dl className="kartu-field">
+              <dt>Jurusan</dt>
+              <dd>{jurusanLabel}</dd>
+            </dl>
+            <dl className="kartu-field">
+              <dt>Asal Sekolah</dt>
+              <dd>{siswa.asal_sekolah || "—"}</dd>
+            </dl>
+            <dl className="kartu-field">
+              <dt>Tanggal Daftar</dt>
+              <dd>{formatTanggalDaftar(siswa.submitted_at)}</dd>
+            </dl>
+            <dl className="kartu-field">
+              <dt>Status</dt>
+              <dd style={{ color: statusCfg.color }}>{statusCfg.label}</dd>
             </dl>
           </div>
 
-          <footer className="print-card-footer">
-            Kartu ini sah sebagai bukti pendaftaran. hello@smkdigital.sch.id · (021)
-            77201052
-          </footer>
-        </article>
+          <div className="kartu-card-footer">
+            hello@smkdigital.sch.id · (021) 77201052
+          </div>
+        </div>
+
+        <Link href="/pendaftaran" className="kartu-back" data-animate data-delay="150">
+          ← Kembali ke Pendaftaran
+        </Link>
       </div>
     </>
   );

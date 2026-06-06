@@ -33,7 +33,7 @@ interface LoginEntry {
   userId: string;
   email: string;
   name: string;
-  status: "success" | "failed";
+  status: "berhasil" | "gagal";
   ip: string;
   userAgent: string;
   timestamp: string;
@@ -77,7 +77,7 @@ export default function DashboardPage() {
         const h: LoginEntry[] = d.history ?? [];
         setHistory(h);
         const total = h.length;
-        const failed = h.filter((e) => e.status === "failed").length;
+        const failed = h.filter((e) => e.status === "gagal").length;
         const success = total - failed;
         setStats({
           totalUsers: d.totalUsers ?? 1,
@@ -631,9 +631,9 @@ export default function DashboardPage() {
                         </td>
                         <td>
                           <span
-                            className={`status-badge ${entry.status === "success" ? "success" : "failed"}`}
+                            className={`status-badge ${entry.status === "berhasil" ? "success" : "failed"}`}
                           >
-                            {entry.status === "success"
+                            {entry.status === "berhasil"
                               ? "BERHASIL"
                               : "GAGAL"}
                           </span>

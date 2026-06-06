@@ -12,6 +12,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
@@ -19,7 +20,6 @@ import {
   BarChart2,
   Users,
   History,
-  Newspaper,
   User as UserIcon,
   LogOut,
   Search,
@@ -58,9 +58,8 @@ interface NavLink {
 
 const navLinks: NavLink[] = [
   { href: "/dashboard", label: "Beranda", icon: LayoutDashboard },
-  { href: "/dashboard/berita", label: "Berita", icon: Newspaper, adminOnly: true },
   { href: "/dashboard/laporan", label: "Laporan", icon: BarChart2 },
-  { href: "/dashboard/users", label: "Manajemen Pendaftar", icon: Users, adminOnly: true },
+  { href: "/dashboard/users", label: "Manajemen User", icon: Users, adminOnly: true },
   { href: "/dashboard/history", label: "Riwayat Login", icon: History, adminOnly: true },
   { href: "/dashboard/profile", label: "Profil Saya", icon: UserIcon },
 ];
@@ -82,12 +81,12 @@ const notifBg: Record<string, string> = {
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  const [userLoaded, setUserLoaded] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notifOpen, setNotifOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [userLoaded, setUserLoaded] = useState(false);
-const notifRef = useRef<HTMLDivElement>(null);
+  const notifRef = useRef<HTMLDivElement>(null);
 
   const unread = notifications.filter((n) => !n.read).length;
 
@@ -100,24 +99,29 @@ const notifRef = useRef<HTMLDivElement>(null);
     const data = await res.json();
     setUser(data.user);
     setUserLoaded(true);
-  }, [router]);
 
-  // TODO: aktifkan setelah /api/notifications dibuat
-  // const fetchNotifications = useCallback(async () => {
-  //   const res = await fetch("/api/notifications");
-  //   if (res.ok) {
-  //     const data = await res.json();
-  //     setNotifications(data.notifications ?? []);
-  //   }
-  // }, []);
+    // Redirect user biasa jika akses halaman admin
+    const adminOnlyPaths = ["/dashboard/users", "/dashboard/berita", "/dashboard/laporan"];
+    const isAdminPath = adminOnlyPaths.some(p => pathname.startsWith(p));
+    if (isAdminPath && data.user.role !== "admin") {
+      router.push("/dashboard");
+    }
+  }, [router, pathname]);
+
+  const fetchNotifications = useCallback(async () => {
+    const res = await fetch("/api/notifications");
+    if (res.ok) {
+      const data = await res.json();
+      setNotifications(data.notifications ?? []);
+    }
+  }, []);
 
   useEffect(() => {
     fetchUser();
-    // TODO: aktifkan setelah /api/notifications dibuat
-    // fetchNotifications();
-    // const interval = setInterval(fetchNotifications, 10000);
-    // return () => clearInterval(interval);
-  }, [fetchUser]);
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 10000);
+    return () => clearInterval(interval);
+  }, [fetchUser, fetchNotifications]);
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -169,9 +173,7 @@ const notifRef = useRef<HTMLDivElement>(null);
   }
 
   const pageTitle = navLinks.find((l) => l.href === pathname)?.label ?? "Dashboard";
-  const visibleNav = !userLoaded
-    ? navLinks
-    : navLinks.filter((l) => !l.adminOnly || user?.role === "admin");
+  const visibleNav = navLinks.filter((l) => !l.adminOnly || user?.role === "admin");
 
   return (
     <>
@@ -612,7 +614,7 @@ const notifRef = useRef<HTMLDivElement>(null);
 
       <aside className={`sidebar${sidebarOpen ? " open" : ""}`}>
         <div className="sidebar-logo-row">
-          <div className="sidebar-logo-mark">S</div>
+          <Image src="/logo-smk.png" alt="Logo" width={32} height={32} style={{ objectFit: "contain", flexShrink: 0 }} />
           <div className="sidebar-logo-text">SMK Citra Negara</div>
         </div>
 
