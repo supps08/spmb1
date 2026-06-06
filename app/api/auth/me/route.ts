@@ -53,7 +53,12 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await req.json();
+  let body: { name?: string; avatar_url?: string | null };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Request tidak valid." }, { status: 400 });
+  }
   const { name, avatar_url } = body as { name?: string; avatar_url?: string | null };
 
   const updates: Record<string, string | null> = {};

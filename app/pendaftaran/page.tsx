@@ -39,11 +39,11 @@ const ESTIMASI: Record<number, string> = {
 };
 
 function formatLastSaved(date: Date | null): string {
-  if (!date) return "Tersimpan otomatis";
+  if (!date) return "Belum tersimpan";
   const diffSec = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (diffSec < 60) return "Tersimpan otomatis barusan";
+  if (diffSec < 60) return "Tersimpan barusan";
   const diffMin = Math.floor(diffSec / 60);
-  return `Tersimpan otomatis ${diffMin} menit lalu`;
+  return `Tersimpan ${diffMin} menit lalu`;
 }
 
 const AGAMA_OPTIONS = ["Islam", "Kristen", "Katolik", "Hindu", "Buddha", "Konghucu"];
@@ -414,11 +414,11 @@ export default function PendaftaranPage() {
       throw new Error(upErr.message);
     }
 
-    const { data: signed } = await supabase.storage
+    const { data: publicData } = supabase.storage
       .from("berkas-pendaftaran")
-      .createSignedUrl(path, 60 * 60 * 24 * 365);
+      .getPublicUrl(path);
 
-    return signed?.signedUrl ?? path;
+    return publicData?.publicUrl ?? path;
   }
 
   async function persistStep(current: number) {
@@ -478,11 +478,23 @@ export default function PendaftaranPage() {
           .from("ortu")
           .update(ortuPayload)
           .eq("siswa_id", siswaId);
-        if (error) throw new Error(error.message);
-      } else {
-        const { error } = await supabase.from("ortu").insert(ortuPayload);
-        if (error) throw new Error(error.message);
-      }
+        const { data: existing } = await supabase
+    .from("ortu").select("id").eq("siswa_id", siswaId).maybeSingle();
+
+  let result;
+  if (existing) {
+    result = await supabase.from("ortu").update(ortuPayload).eq("siswa_id", siswaId);
+  } else {
+    result = await supabase.from("ortu").insert(ortuPayload);
+  }
+
+  if (result.error) {
+    // Tampilkan ke user, jangan diam-diam throw
+    showToast("Gagal menyimpan data orang tua: " + result.error.message, "error");
+    return; // ← jangan lanjut ke step berikutnya
+  }
+  // update tahap_terakhir hanya jika sukses...
+} 
 
       await supabase
         .from("siswa")
@@ -1977,7 +1989,7 @@ export default function PendaftaranPage() {
                     display: "inline-block",
                   }}
                 />
-                {lastSavedText || "Tersimpan otomatis"}
+                {lastSavedText || "Belum tersimpan"}
               </>
             )}
           </div>

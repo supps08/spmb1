@@ -102,7 +102,16 @@ export async function PUT(req: NextRequest, { params }: Params) {
     }
 
     const updates: Record<string, unknown> = {};
-    if (judul !== undefined) updates.judul = judul.trim();
+    if (judul !== undefined) {
+      updates.judul = judul.trim();
+      // Update slug saat judul berubah
+      const newSlug = judul.trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, "")
+        .replace(/\s+/g, "-")
+        .replace(/-+/g, "-") + "-" + Date.now();
+      updates.slug = newSlug;
+    }
     if (konten !== undefined) updates.konten = konten;
     if (ringkasan !== undefined) updates.ringkasan = ringkasan;
     if (kategori !== undefined) updates.kategori = kategori;
@@ -132,7 +141,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Gagal memperbarui berita." }, { status: 500 });
     }
 
-    return NextResponse.json({ berita: data });
+    return NextResponse.json({ berita: data, slugChanged: updates.slug !== undefined });
   } catch (err) {
     console.error("[berita/[slug] PUT]", err);
     return NextResponse.json({ error: "Terjadi kesalahan server." }, { status: 500 });

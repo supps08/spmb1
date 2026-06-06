@@ -83,6 +83,7 @@ export default function HistoryPage() {
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
   const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [lastUpdatedStr, setLastUpdatedStr] = useState("");
 
   const fetchHistory = useCallback(async () => {
     const res = await fetch("/api/admin/history");
@@ -99,6 +100,10 @@ export default function HistoryPage() {
     const interval = setInterval(fetchHistory, 15000);
     return () => clearInterval(interval);
   }, [fetchHistory]);
+
+  useEffect(() => {
+    setLastUpdatedStr(lastUpdated.toLocaleTimeString("id-ID"));
+  }, [lastUpdated]);
 
   useEffect(() => {
     setPage(1);
@@ -608,7 +613,7 @@ export default function HistoryPage() {
             <h1>Riwayat Login</h1>
             <div className="live-meta">
               <span className="live-dot" aria-hidden="true" />
-              LIVE · {lastUpdated.toLocaleTimeString("id-ID")}
+              LIVE · {lastUpdatedStr}
             </div>
           </div>
           <button

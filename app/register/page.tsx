@@ -24,11 +24,11 @@ export default function RegisterPage() {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: form.name, email: form.email, password: form.password }),
+        body: JSON.stringify({ name: form.name, email: form.email, password: form.password, phone: form.whatsapp }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Registrasi gagal."); }
-      else { router.push("/dashboard"); }
+      else { router.push("/pendaftaran"); }
     } catch { setError("Koneksi gagal. Coba lagi."); }
     finally { setLoading(false); }
   }

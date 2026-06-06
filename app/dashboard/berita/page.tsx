@@ -27,13 +27,13 @@ interface FormState {
   is_published: boolean;
 }
 
-const KATEGORI_OPTIONS = ["Umum", "Akademik", "Prestasi", "Pengumuman"];
+const KATEGORI_OPTIONS = ["umum", "akademik", "prestasi", "pengumuman"];
 
 const emptyForm: FormState = {
   judul: "",
   ringkasan: "",
   konten: "",
-  kategori: "Umum",
+  kategori: "umum",
   thumbnail_url: "",
   is_published: false,
 };
@@ -151,6 +151,13 @@ export default function DashboardBeritaPage() {
         const err = await res.json().catch(() => ({}));
         showToast(err.error ?? "Gagal menyimpan.", "error");
         return;
+      }
+
+      const resData = await res.json().catch(() => ({}));
+
+      // Kalau slug berubah (judul diedit), update editingSlug ke slug baru
+      if (resData.slugChanged && resData.berita?.slug) {
+        setEditingSlug(resData.berita.slug);
       }
 
       showToast(publish ? "Berita dipublikasikan." : "Draft disimpan.");
@@ -407,7 +414,7 @@ export default function DashboardBeritaPage() {
               >
                 {KATEGORI_OPTIONS.map((k) => (
                   <option key={k} value={k}>
-                    {k}
+                    {k.charAt(0).toUpperCase() + k.slice(1)}
                   </option>
                 ))}
               </select>

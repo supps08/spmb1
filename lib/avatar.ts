@@ -1,4 +1,3 @@
-// lib/avatar.ts
 export interface AvatarColor {
     bg: string;
     color: string;
