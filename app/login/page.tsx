@@ -311,7 +311,7 @@ export default function LoginPage() {
       <div className="auth-page">
         <Image
           className="auth-bg"
-          src="/sekolah.jpg"
+          src="/sekolah/kegiatan.jpg"
           alt=""
           fill
           priority
@@ -322,7 +322,7 @@ export default function LoginPage() {
         <div className="auth-content">
           <div className="auth-card">
             <div className="brand">
-              <Image src="/logo-smk.png" alt="Logo SMK Citra Negara" width={64} height={64} style={{ objectFit: "contain", marginBottom: 8 }} priority />
+              <Image src="/logo-smk.png" alt="Logo SMK Citra Negara" width={64} height={64} style={{ objectFit: "contain", marginBottom: 8, display: "block", margin: "0 auto 8px" }} priority />
               <h1>Login Pendaftaran Citra Negara</h1>
               <p>Masuk ke portal pendaftaran Citra Negara untuk melanjutkan proses admisi Anda.</p>
             </div>
