@@ -1,3 +1,11 @@
+// ============================================================
+// STATUS : 🆕 BARU
+// PATH   : app/dashboard/history/page.tsx
+// ISI    : Halaman histori login lengkap (khusus admin)
+//          - Filter tab: Semua / Berhasil / Gagal
+//          - Live indicator + polling otomatis 15 detik
+//          - Tabel: nama, email, status, IP, browser, waktu
+// ============================================================
 
 "use client";
 
@@ -490,7 +498,7 @@ export default function HistoryPage() {
           border-color: #EBF4EE;
         }
 
-        
+        /* Skeleton */
         .skeleton-row td {
           padding: 14px 20px;
         }
@@ -528,7 +536,7 @@ export default function HistoryPage() {
           font-size: 14px;
         }
 
-        
+        /* Pagination */
         .pagination {
           display: flex;
           align-items: center;

@@ -1,7 +1,16 @@
+// ============================================================
+// STATUS : 🆕 BARU
+// PATH   : app/dashboard/page.tsx
+// ISI    : Halaman beranda dashboard
+//          - Welcome banner
+//          - 4 stat card: total pendaftar, pendaftar hari ini, success rate, berkas kurang lengkap
+//          - Tabel pendaftar baru terkini (15 baris)
+//          - Polling real-time setiap 15 detik + animasi pulse saat update
+// ============================================================
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Users,
   LogIn,
@@ -11,6 +20,7 @@ import {
 } from "lucide-react";
 import { useScrollAnimation } from "@/lib/useScrollAnimation";
 import { avatarColor } from "@/lib/avatar";
+import { createClient } from "@/lib/supabase/client";
 
 interface User {
   id: string;
@@ -19,34 +29,28 @@ interface User {
   role: string;
 }
 
-interface LoginEntry {
+interface PendaftarEntry {
   id: string;
-  userId: string;
-  email: string;
-  name: string;
-  status: "success" | "failed";
-  ip: string;
-  userAgent: string;
-  timestamp: string;
-  reason?: string;
+  nama_lengkap: string;
+  nisn: string;
+  status: string;
+  submitted_at: string;
+  jurusan: { kode: string; nama: string } | { kode: string; nama: string }[] | null;
 }
 
 interface StatsData {
-  totalUsers: number;
-  totalLogins: number;
-  failedLogins: number;
+  totalPendaftar: number;
+  pendaftarHariIni: number;
+  berkasKurang: number;
   successRate: number;
-}
-
-function displayName(entry: LoginEntry) {
-  return entry.name !== "-" ? entry.name : entry.email;
 }
 
 export default function DashboardPage() {
   useScrollAnimation();
 
+  const supabase = useMemo(() => createClient(), []);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [history, setHistory] = useState<LoginEntry[]>([]);
+  const [pendaftar, setPendaftar] = useState<PendaftarEntry[]>([]);
   const [stats, setStats] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
@@ -55,35 +59,40 @@ export default function DashboardPage() {
 
   const fetchAll = useCallback(async () => {
     try {
-      const [meRes, histRes] = await Promise.all([
-        fetch("/api/auth/me"),
-        fetch("/api/admin/history"),
-      ]);
+      const meRes = await fetch("/api/auth/me");
       if (meRes.ok) {
         const d = await meRes.json();
         setCurrentUser(d.user);
       }
-      if (histRes.ok) {
-        const d = await histRes.json();
-        const h: LoginEntry[] = d.history ?? [];
-        setHistory(h);
-        const total = h.length;
-        const failed = h.filter((e) => e.status === "failed").length;
-        const success = total - failed;
-        setStats({
-          totalUsers: d.totalUsers ?? 1,
-          totalLogins: total,
-          failedLogins: failed,
-          successRate: total > 0 ? Math.round((success / total) * 100) : 100,
-        });
-        setPulse(true);
-        setTimeout(() => setPulse(false), 600);
-        setLastUpdated(new Date());
-      }
+
+      const { data: siswaData } = await supabase
+        .from("siswa")
+        .select("id, nama_lengkap, nisn, status, submitted_at, jurusan(kode, nama)")
+        .neq("status", "draft")
+        .order("submitted_at", { ascending: false })
+        .limit(50);
+
+      const list: PendaftarEntry[] = (siswaData ?? []) as PendaftarEntry[];
+      setPendaftar(list);
+
+      const todayStr = new Date().toISOString().split("T")[0];
+      const totalPendaftar = list.length;
+      const pendaftarHariIni = list.filter(
+        (s) => s.submitted_at?.startsWith(todayStr)
+      ).length;
+      const berkasKurang = list.filter((s) => s.status === "menunggu").length;
+      const diterima = list.filter((s) => s.status === "diterima").length;
+      const successRate =
+        totalPendaftar > 0 ? Math.round((diterima / totalPendaftar) * 100) : 0;
+
+      setStats({ totalPendaftar, pendaftarHariIni, berkasKurang, successRate });
+      setPulse(true);
+      setTimeout(() => setPulse(false), 600);
+      setLastUpdated(new Date());
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [supabase]);
 
   useEffect(() => {
     fetchAll();
@@ -105,22 +114,14 @@ export default function DashboardPage() {
     return `${Math.floor(h / 24)} hari lalu`;
   }
 
-  function getBrowser(ua: string) {
-    if (ua.includes("Firefox")) return "Firefox";
-    if (ua.includes("Edg")) return "Edge";
-    if (ua.includes("Chrome")) return "Chrome";
-    if (ua.includes("Safari")) return "Safari";
-    return "Browser";
-  }
-
   const roleLabel =
     currentUser?.role === "admin" ? "ADMINISTRATOR" : "PENGGUNA";
 
   const displayStats = stats ?? {
-    totalUsers: 0,
-    totalLogins: 0,
-    failedLogins: 0,
-    successRate: 100,
+    totalPendaftar: 0,
+    pendaftarHariIni: 0,
+    berkasKurang: 0,
+    successRate: 0,
   };
 
   return (
@@ -135,7 +136,7 @@ export default function DashboardPage() {
           font-family: 'Plus Jakarta Sans', sans-serif;
         }
 
-        
+        /* Hero */
         .hero-banner {
           position: relative;
           overflow: hidden;
@@ -194,7 +195,7 @@ export default function DashboardPage() {
           line-height: 1.5;
         }
 
-        
+        /* Stats */
         .stats-grid {
           display: grid;
           grid-template-columns: repeat(4, 1fr);
@@ -265,7 +266,7 @@ export default function DashboardPage() {
           margin-top: 6px;
         }
 
-        
+        /* History panel */
         .panel {
           background: #fff;
           border: 1px solid #E5E7EB;
@@ -517,9 +518,9 @@ export default function DashboardPage() {
               <Users size={20} strokeWidth={2} />
             </div>
             <div className={`stat-value${pulse ? " pulse" : ""}`}>
-              {displayStats.totalUsers}
+              {displayStats.totalPendaftar}
             </div>
-            <div className="stat-label">Total Pengguna</div>
+            <div className="stat-label">Total Pendaftar</div>
           </div>
 
           <div className="stat-card" data-animate data-delay="100">
@@ -527,9 +528,9 @@ export default function DashboardPage() {
               <LogIn size={20} strokeWidth={2} />
             </div>
             <div className={`stat-value${pulse ? " pulse" : ""}`}>
-              {displayStats.totalLogins}
+              {displayStats.pendaftarHariIni}
             </div>
-            <div className="stat-label">Login Hari Ini</div>
+            <div className="stat-label">Pendaftar Hari Ini</div>
           </div>
 
           <div className="stat-card" data-animate data-delay="200">
@@ -547,15 +548,15 @@ export default function DashboardPage() {
               <XCircle size={20} strokeWidth={2} />
             </div>
             <div className={`stat-value${pulse ? " pulse" : ""}`}>
-              {displayStats.failedLogins}
+              {displayStats.berkasKurang}
             </div>
-            <div className="stat-label">Gagal</div>
+            <div className="stat-label">Berkas Kurang Lengkap</div>
           </div>
         </div>
 
         <section className="panel" data-animate data-delay="100">
           <div className="panel-header">
-            <h3>Histori Login Terkini</h3>
+            <h3>Pendaftar Baru</h3>
             <span className="live-badge">
               <span className="live-dot" aria-hidden="true" />
               LIVE · {lastUpdatedStr}
@@ -567,28 +568,38 @@ export default function DashboardPage() {
               <div className="spinner" />
               Memuat data...
             </div>
-          ) : history.length === 0 ? (
+          ) : pendaftar.length === 0 ? (
             <div className="empty-state" data-animate data-delay="0">
-              Belum ada histori login.
+              Belum ada pendaftar.
             </div>
           ) : (
             <>
               <table className="history-table">
                 <thead>
                   <tr>
-                    <th>Pengguna</th>
-                    <th>Alamat IP</th>
-                    <th>Browser</th>
-                    <th>Waktu</th>
+                    <th>Pendaftar</th>
+                    <th>NISN</th>
+                    <th>Jurusan</th>
+                    <th>Waktu Daftar</th>
                     <th>Status</th>
                     <th>Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {history.slice(0, 15).map((entry, idx) => {
-                    const name = displayName(entry);
+                  {pendaftar.slice(0, 15).map((entry, idx) => {
+                    const name = entry.nama_lengkap || "—";
                     const colors = avatarColor(name);
                     const initial = name.charAt(0).toUpperCase();
+                    const jurusan = Array.isArray(entry.jurusan)
+                      ? entry.jurusan[0]
+                      : entry.jurusan;
+                    const statusMap: Record<string, { label: string; cls: string }> = {
+                      submitted: { label: "Dikirim", cls: "success" },
+                      menunggu:  { label: "Menunggu", cls: "failed" },
+                      diterima:  { label: "Diterima", cls: "success" },
+                      ditolak:   { label: "Ditolak",  cls: "failed" },
+                    };
+                    const st = statusMap[entry.status] ?? { label: entry.status, cls: "success" };
                     return (
                       <tr
                         key={entry.id}
@@ -600,43 +611,30 @@ export default function DashboardPage() {
                           <div className="user-cell">
                             <div
                               className="row-avatar"
-                              style={{
-                                background: colors.bg,
-                                color: colors.color,
-                              }}
+                              style={{ background: colors.bg, color: colors.color }}
                             >
                               {initial}
                             </div>
                             <div>
                               <div className="user-name">{name}</div>
-                              <div className="user-email">{entry.email}</div>
                             </div>
                           </div>
                         </td>
-                        <td>
-                          <span className="ip-cell">{entry.ip}</span>
-                        </td>
-                        <td>{getBrowser(entry.userAgent)}</td>
+                        <td><span className="ip-cell">{entry.nisn || "—"}</span></td>
+                        <td>{jurusan ? `${jurusan.kode} — ${jurusan.nama}` : "—"}</td>
                         <td className="time-cell">
-                          {timeAgo(entry.timestamp)}
+                          {entry.submitted_at ? timeAgo(entry.submitted_at) : "—"}
                         </td>
                         <td>
-                          <span
-                            className={`status-badge ${entry.status === "success" ? "success" : "failed"}`}
-                          >
-                            {entry.status === "success"
-                              ? "BERHASIL"
-                              : "GAGAL"}
+                          <span className={`status-badge ${st.cls}`}>
+                            {st.label.toUpperCase()}
                           </span>
-                          {entry.reason && (
-                            <div className="fail-reason">{entry.reason}</div>
-                          )}
                         </td>
                         <td>
                           <button
                             type="button"
                             className="aksi-btn"
-                            aria-label={`Detail login ${name}`}
+                            aria-label={`Detail pendaftar ${name}`}
                           >
                             <Eye size={16} />
                           </button>

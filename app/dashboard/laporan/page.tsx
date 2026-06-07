@@ -3,19 +3,8 @@
 
 import { useState, useEffect, useMemo, useCallback, Fragment } from "react";
 import Link from "next/link";
-import { FileSpreadsheet, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import * as XLSX from "xlsx";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-} from "recharts";
 import { useScrollAnimation } from "@/lib/useScrollAnimation";
 
 interface StatsSiswa {
@@ -52,6 +41,60 @@ interface JurusanDetailData {
 
 const HARI = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
 
+function MiniBarChart({ data }: { data: TrendData[] }) {
+  const maxVal = Math.max(...data.map((d) => d.jumlah), 1);
+  const W = 200, H = 100, pad = 4, barW = Math.floor((W - pad * 2) / data.length) - 4;
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="100%" style={{ overflow: "visible" }}>
+      {data.map((d, i) => {
+        const barH = Math.max((d.jumlah / maxVal) * (H - 20), 2);
+        const x = pad + i * ((W - pad * 2) / data.length) + 2;
+        const y = H - 14 - barH;
+        return (
+          <g key={i}>
+            <rect x={x} y={y} width={barW} height={barH} rx={3} fill="#1C5C38" />
+            <text x={x + barW / 2} y={H - 2} textAnchor="middle" fontSize={9} fill="#6B7280">{d.hari}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+function MainBarChart({ data, maxVal }: { data: TrendData[]; maxVal: number }) {
+  const W = 560, H = 220, padL = 36, padB = 28, padT = 10, padR = 12;
+  const innerW = W - padL - padR;
+  const innerH = H - padB - padT;
+  const mx = Math.max(maxVal, 1);
+  const barW = Math.floor(innerW / data.length) - 8;
+  const ticks = [0, Math.round(mx / 2), mx];
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="100%" style={{ overflow: "visible" }}>
+      {ticks.map((t) => {
+        const y = padT + innerH - (t / mx) * innerH;
+        return (
+          <g key={t}>
+            <line x1={padL} x2={W - padR} y1={y} y2={y} stroke="#E5E7EB" strokeWidth={1} />
+            <text x={padL - 4} y={y + 4} textAnchor="end" fontSize={10} fill="#6B7280">{t}</text>
+          </g>
+        );
+      })}
+      {data.map((d, i) => {
+        const barH = Math.max((d.jumlah / mx) * innerH, 2);
+        const x = padL + i * (innerW / data.length) + 4;
+        const y = padT + innerH - barH;
+        const isMax = d.jumlah === maxVal && maxVal > 0;
+        return (
+          <g key={i}>
+            <rect x={x} y={y} width={barW} height={barH} rx={4} fill={isMax ? "#1C5C38" : "#D1FAE5"} />
+            <text x={x + barW / 2} y={H - 8} textAnchor="middle" fontSize={11} fill="#6B7280">{d.hari}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
 export default function LaporanPage() {
   useScrollAnimation();
 
@@ -67,8 +110,6 @@ export default function LaporanPage() {
   const [rekap, setRekap] = useState<RekapJurusan[]>([]);
   const [trend, setTrend] = useState<TrendData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [exporting, setExporting] = useState(false);
-  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
   const [pengaturan, setPengaturan] = useState<Record<string, string>>({});
   const [expandedJurusan, setExpandedJurusan] = useState<string | null>(null);
   const [jurusanDetails, setJurusanDetails] = useState<
@@ -76,10 +117,6 @@ export default function LaporanPage() {
   >({});
   const [loadingDetailId, setLoadingDetailId] = useState<string | null>(null);
 
-  const showToast = useCallback((msg: string, type: "success" | "error") => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 3500);
-  }, []);
 
   useEffect(() => {
     async function fetchAll() {
@@ -249,83 +286,6 @@ export default function LaporanPage() {
     [expandedJurusan, jurusanDetails, fetchJurusanDetail]
   );
 
-  async function exportExcel(jurusanId?: string) {
-    setExporting(true);
-    try {
-      let query = supabase
-        .from("siswa")
-        .select(`
-          nama_lengkap, nisn, nik, asal_sekolah,
-          nilai_rata_rata, status, submitted_at, verified_at,
-          catatan_verifikasi, jurusan_id,
-          jurusan (kode, nama),
-          ortu (nama_ayah, nama_ibu, no_ortu)
-        `)
-        .neq("status", "draft")
-        .order("submitted_at", { ascending: false });
-
-      if (jurusanId) {
-        query = query.eq("jurusan_id", jurusanId);
-      }
-
-      const { data: siswaList } = await query;
-
-      if (!siswaList || siswaList.length === 0) {
-        showToast("Tidak ada data untuk diekspor", "error");
-        return;
-      }
-
-      const rows = siswaList.map((s, i) => {
-        const jurusan = Array.isArray(s.jurusan) ? s.jurusan[0] : s.jurusan;
-        const ortu = Array.isArray(s.ortu) ? s.ortu[0] : s.ortu;
-
-        return {
-          No: i + 1,
-          "Nama Lengkap": s.nama_lengkap,
-          NISN: s.nisn,
-          NIK: s.nik,
-          "Asal Sekolah": s.asal_sekolah,
-          Jurusan: jurusan?.nama,
-          "Kode Jurusan": jurusan?.kode,
-          "Nilai Rata-rata": s.nilai_rata_rata,
-          Status: s.status,
-          "Tanggal Daftar": s.submitted_at
-            ? new Date(s.submitted_at).toLocaleDateString("id-ID")
-            : "-",
-          "Tanggal Verifikasi": s.verified_at
-            ? new Date(s.verified_at).toLocaleDateString("id-ID")
-            : "-",
-          "Nama Ayah": ortu?.nama_ayah,
-          "Nama Ibu": ortu?.nama_ibu,
-          "No WA Ortu": ortu?.no_ortu,
-          Catatan: s.catatan_verifikasi ?? "-",
-        };
-      });
-
-      const ws = XLSX.utils.json_to_sheet(rows);
-
-      const colWidths = Object.keys(rows[0]).map((key) => ({
-        wch: Math.max(key.length, 15),
-      }));
-      ws["!cols"] = colWidths;
-
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Data Pendaftar");
-
-      const tanggal = new Date().toLocaleDateString("id-ID").replace(/\//g, "-");
-      const jurusanKode = jurusanId
-        ? rekap.find((j) => j.id === jurusanId)?.kode ?? "jurusan"
-        : null;
-      const fileName = jurusanKode
-        ? `SPMB-${jurusanKode}-${tanggal}.xlsx`
-        : `SPMB-SMK-Citra-Negara-${tanggal}.xlsx`;
-      XLSX.writeFile(wb, fileName);
-    } catch {
-      showToast("Gagal mengekspor data.", "error");
-    } finally {
-      setExporting(false);
-    }
-  }
 
   const maxTrend = useMemo(
     () => Math.max(...trend.map((t) => t.jumlah), 0),
@@ -997,15 +957,6 @@ export default function LaporanPage() {
             <h1 className="laporan-title">Laporan</h1>
             <p className="laporan-subtitle">Tahun Ajaran {tahunAjaran}</p>
           </div>
-          <button
-            type="button"
-            className="export-btn no-print"
-            onClick={() => exportExcel()}
-            disabled={exporting}
-          >
-            <FileSpreadsheet size={18} />
-            {exporting ? "Mengekspor..." : "Export Excel"}
-          </button>
         </div>
 
         {loading ? (
@@ -1275,45 +1226,7 @@ export default function LaporanPage() {
                                             Tren 7 Hari Terakhir
                                           </div>
                                           <div className="mini-chart-wrap">
-                                            <ResponsiveContainer
-                                              width="100%"
-                                              height={120}
-                                            >
-                                              <BarChart
-                                                data={detail.trend7}
-                                                barSize={20}
-                                              >
-                                                <XAxis
-                                                  dataKey="hari"
-                                                  axisLine={false}
-                                                  tickLine={false}
-                                                  tick={{
-                                                    fontSize: 10,
-                                                    fill: "#6B7280",
-                                                  }}
-                                                />
-                                                <Tooltip
-                                                  cursor={{
-                                                    fill: "#EBF4EE",
-                                                  }}
-                                                  contentStyle={{
-                                                    border:
-                                                      "1px solid #E5E7EB",
-                                                    borderRadius: "8px",
-                                                    fontSize: "11px",
-                                                  }}
-                                                  formatter={(v: unknown) => [
-                                                    `${v} pendaftar`,
-                                                    "",
-                                                  ]}
-                                                />
-                                                <Bar
-                                                  dataKey="jumlah"
-                                                  fill="#1C5C38"
-                                                  radius={[4, 4, 0, 0]}
-                                                />
-                                              </BarChart>
-                                            </ResponsiveContainer>
+                                            <MiniBarChart data={detail.trend7} />
                                           </div>
                                         </div>
                                       </div>
@@ -1326,19 +1239,6 @@ export default function LaporanPage() {
                                         >
                                           Lihat Semua Pendaftar
                                         </Link>
-                                        <button
-                                          type="button"
-                                          className="detail-action-btn secondary"
-                                          disabled={exporting}
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            exportExcel(j.id);
-                                          }}
-                                        >
-                                          {exporting
-                                            ? "Mengekspor..."
-                                            : "Export Data Jurusan"}
-                                        </button>
                                         <button
                                           type="button"
                                           className="detail-action-btn ghost"
@@ -1371,54 +1271,7 @@ export default function LaporanPage() {
                   <span className="chart-badge">7 Hari Terakhir</span>
                 </div>
                 <div className="chart-wrap">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={trend} barSize={32}>
-                      <CartesianGrid
-                        vertical={false}
-                        stroke="#E5E7EB"
-                        strokeDasharray="0"
-                      />
-                      <XAxis
-                        dataKey="hari"
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fontSize: 12, fill: "#6B7280" }}
-                      />
-                      <YAxis
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fontSize: 12, fill: "#6B7280" }}
-                        width={32}
-                      />
-                      <Tooltip
-                        cursor={{ fill: "#F2F8F4" }}
-                        contentStyle={{
-                          border: "1px solid #E5E7EB",
-                          borderRadius: "8px",
-                          fontSize: "12px",
-                        }}
-                        formatter={(v: unknown) => [`${v} pendaftar`, ""]}
-                      />
-                      <Bar
-                        dataKey="jumlah"
-                        radius={[6, 6, 0, 0]}
-                        isAnimationActive={true}
-                        animationDuration={800}
-                        animationEasing="ease-out"
-                      >
-                        {trend.map((entry, index) => (
-                          <Cell
-                            key={index}
-                            fill={
-                              entry.jumlah === maxTrend && maxTrend > 0
-                                ? "#1C5C38"
-                                : "#D1FAE5"
-                            }
-                          />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <MainBarChart data={trend} maxVal={maxTrend} />
                 </div>
               </div>
 
@@ -1449,7 +1302,6 @@ export default function LaporanPage() {
         )}
       </div>
 
-      {toast && <div className={`toast ${toast.type}`}>{toast.msg}</div>}
     </>
   );
 }
