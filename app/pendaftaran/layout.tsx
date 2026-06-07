@@ -1,3 +1,9 @@
+// ============================================================
+// PATH : app/pendaftaran/layout.tsx
+// ISI  : Layout wrapper halaman pendaftaran (user only)
+//        - Navbar sederhana
+//        - Trust badges di bawah
+// ============================================================
 
 import LandingFooter from "@/components/landing/footer";
 import LandingNavbar from "@/components/landing/navbar";
@@ -73,7 +79,7 @@ export default function PendaftaranLayout({ children }: { children: React.ReactN
 
       <LandingNavbar activePage="pendaftaran" />
 
-      {}
+      {/* Content */}
       <main className="pend-main">{children}</main>
 
       <LandingFooter />

@@ -10,7 +10,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Users,
   LogIn,
@@ -48,7 +48,7 @@ interface StatsData {
 export default function DashboardPage() {
   useScrollAnimation();
 
-  const supabase = useMemo(() => createClient(), []);
+  const supabase = createClient();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [pendaftar, setPendaftar] = useState<PendaftarEntry[]>([]);
   const [stats, setStats] = useState<StatsData | null>(null);

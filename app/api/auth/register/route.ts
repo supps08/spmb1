@@ -1,3 +1,7 @@
+// ============================================================
+// PATH : app/api/auth/register/route.ts
+// ISI  : POST → daftarkan user baru via Supabase Auth + insert profiles
+// ============================================================
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
@@ -31,6 +35,8 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = await createClient();
+
+  // Daftarkan ke Supabase Auth
   const { data, error } = await supabase.auth.signUp({
     email: email.trim().toLowerCase(),
     password,
@@ -40,6 +46,7 @@ export async function POST(req: NextRequest) {
   });
 
   if (error) {
+    // Tangani error umum Supabase
     if (error.message.includes("already registered")) {
       return NextResponse.json(
         { error: "Email sudah terdaftar." },

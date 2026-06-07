@@ -1,3 +1,7 @@
+// ============================================================
+// PATH : app/api/berita/[slug]/route.ts
+// ISI  : GET detail | PUT update | DELETE (admin)
+// ============================================================
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
@@ -100,6 +104,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const updates: Record<string, unknown> = {};
     if (judul !== undefined) {
       updates.judul = judul.trim();
+      // Update slug saat judul berubah
       const newSlug = judul.trim()
         .toLowerCase()
         .replace(/[^a-z0-9\s-]/g, "")

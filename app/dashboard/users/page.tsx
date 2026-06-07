@@ -1,3 +1,10 @@
+// ============================================================
+// PATH : app/dashboard/users/page.tsx
+// ISI  : Halaman Manajemen Pendaftar
+//        - Data dari tabel siswa (non-draft)
+//        - Filter jurusan, status, sort, search
+//        - Kartu pendaftar + tombol Detail / Verifikasi
+// ============================================================
 
 "use client";
 

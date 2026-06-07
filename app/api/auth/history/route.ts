@@ -1,10 +1,11 @@
-
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import type { LoginEntry } from "@/lib/auth";
 
 export async function GET() {
   const supabase = await createClient();
+
+  
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -12,6 +13,8 @@ export async function GET() {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  
   const { data: profile } = await supabase
     .from("profiles")
     .select("role")
@@ -21,6 +24,8 @@ export async function GET() {
   if (!profile || profile.role !== "admin") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+
+  
   const { data: rows, error } = await supabase
     .from("login_history")
     .select(
@@ -44,6 +49,8 @@ export async function GET() {
     console.error("[auth/history] Query error:", error.message);
     return NextResponse.json({ error: "Gagal mengambil histori." }, { status: 500 });
   }
+
+  
   const history: LoginEntry[] = (rows ?? []).map((row) => {
     const p = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
     return {
@@ -51,7 +58,7 @@ export async function GET() {
       userId: row.user_id ?? "-",
       email: p?.email ?? "-",
       name: p?.full_name ?? "-",
-      status: row.status as "success" | "failed",
+      status: row.status === "berhasil" ? "success" : "failed",
       ip: row.ip_address,
       userAgent: row.user_agent,
       timestamp: row.created_at,

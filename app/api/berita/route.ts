@@ -1,3 +1,7 @@
+// ============================================================
+// PATH : app/api/berita/route.ts
+// ISI  : GET list berita | POST buat berita (admin)
+// ============================================================
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";

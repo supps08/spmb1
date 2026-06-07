@@ -1,3 +1,17 @@
+// ============================================================
+// PATH   : app/page.tsx
+// ISI    : Landing Page SPMB SMK Citra Negara
+//          - Navbar fixed (scroll effect)
+//          - Hero + foto grid floating
+//          - Marquee jurusan
+//          - Challenges section
+//          - Jurusan unggulan (PPLG, TKJ, MPLB)
+//          - Alur pendaftaran 4 langkah
+//          - Statistik (counter animation)
+//          - Testimonial carousel
+//          - CTA Final
+//          - Footer
+// ============================================================
 
 "use client";
 
@@ -45,16 +59,17 @@ const JURUSAN_LIST = [
     delay: "reveal-delay-1",
   },
   {
-    kode: "PHW",
+    kode: "PH",
     nama: "Perhotelan & Pariwisata",
     desc: "Siap berkarier di industri hospitality dengan pelatihan layanan hotel, front office, dan pariwisata.",
-    img: "/jurusan/phw.jpg",
+    img: "/jurusan/ph.jpg",
     delay: "reveal-delay-2",
   },
 ];
 
 export default function LandingPage() {
   useEffect(() => {
+    // Scroll reveal
     const reveals = document.querySelectorAll(".reveal");
     const observer = new IntersectionObserver(
       (entries) => {
@@ -68,6 +83,8 @@ export default function LandingPage() {
       { threshold: 0.12 }
     );
     reveals.forEach((el) => observer.observe(el));
+
+    // Smooth scroll
     const links = document.querySelectorAll('a[href^="#"]');
     const handleClick = (e: Event) => {
       const a = e.currentTarget as HTMLAnchorElement;
@@ -180,7 +197,7 @@ export default function LandingPage() {
           border-radius: 50%; background: var(--accent); flex-shrink: 0;
         }
 
-        
+        /* ANIMATIONS */
         @keyframes float-a { 0%,100%{transform:translateY(0) rotate(-2deg)} 50%{transform:translateY(-12px) rotate(-2deg)} }
         @keyframes float-b { 0%,100%{transform:translateY(0) rotate(1.5deg)} 50%{transform:translateY(-16px) rotate(1.5deg)} }
         @keyframes float-c { 0%,100%{transform:translateY(0) rotate(-1deg)} 50%{transform:translateY(-8px) rotate(-1deg)} }
@@ -204,7 +221,7 @@ export default function LandingPage() {
         .reveal-delay-2 { transition-delay: 0.2s; }
         .reveal-delay-3 { transition-delay: 0.3s; }
 
-        
+        /* ===== HERO ===== */
         .hero {
           padding: 140px 0 100px;
           padding-top: calc(68px + 72px);
@@ -270,7 +287,7 @@ export default function LandingPage() {
           display: flex; align-items: center; justify-content: center; flex-shrink: 0;
         }
 
-        
+        /* ===== MARQUEE ===== */
         .marquee-section { background: var(--ink-2,#1A1A1A); padding: 22px 0; overflow: hidden; }
         .marquee-track {
           display: flex; width: max-content;
@@ -284,7 +301,7 @@ export default function LandingPage() {
         }
         .marquee-dot { width:6px;height:6px;background:var(--accent);border-radius:50%;flex-shrink:0; }
 
-        
+        /* ===== CHALLENGES ===== */
         .challenges { background: var(--bg-soft); padding: 120px 0; }
         .challenges-inner {
           display: grid; grid-template-columns: 1fr 1fr;
@@ -317,7 +334,7 @@ export default function LandingPage() {
         .stat-float .big { font-family:'Bricolage Grotesque',sans-serif;font-size:2rem;font-weight:800;color:var(--ink); }
         .stat-float .lbl { font-size:0.8rem;color:var(--muted);margin-top:2px; }
 
-        
+        /* ===== JURUSAN ===== */
         .jurusan { padding: 120px 0; }
         .jurusan-header { margin-bottom: 60px; }
         .jurusan h2 { font-size: clamp(2rem,3.5vw,3rem); font-weight: 800; }
@@ -342,7 +359,7 @@ export default function LandingPage() {
         .jurusan-arrow { margin-top:16px;display:inline-flex;align-items:center;gap:6px;font-size:0.82rem;font-weight:600;color:var(--accent);text-decoration:none; }
         .jurusan-arrow:hover { text-decoration:underline; }
 
-        
+        /* ===== ALUR ===== */
         .alur { padding: 120px 0; background: var(--bg); }
         .alur-top { display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:80px;gap:40px; }
         .alur-top-left { flex: 1; }
@@ -359,7 +376,7 @@ export default function LandingPage() {
         .step-title { font-family:'Bricolage Grotesque',sans-serif;font-size:1.2rem;font-weight:700;margin-bottom:10px;letter-spacing:-0.01em; }
         .step-desc { font-size:0.9rem;color:var(--muted);line-height:1.65;max-width:480px; }
 
-        
+        /* ===== STATISTIK ===== */
         .stats { background: var(--ink-2,#1A1A1A); padding: 120px 0; }
         .stats-label { color: rgba(255,255,255,0.5); }
         .stats-label::before { background: var(--accent); }
@@ -484,13 +501,13 @@ export default function LandingPage() {
           font-size: 0.88rem; color: rgba(255,255,255,0.8);
         }
 
-        
+        /* ===== MARQUEE 2 ===== */
         .marquee-section-2 { background:var(--bg-soft);padding:22px 0;overflow:hidden; }
         .marquee-track-2 { display:flex;width:max-content;animation:marquee-right 40s linear infinite; }
         .marquee-item-2 { display:flex;align-items:center;gap:24px;padding:0 24px;font-size:0.82rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:rgba(0,0,0,0.3);white-space:nowrap; }
         .marquee-dot-2 { width:5px;height:5px;background:var(--accent);border-radius:50%;flex-shrink:0; }
 
-        
+        /* ===== TESTIMONIAL ===== */
         .testimonial { padding: 120px 0; overflow: hidden; }
         .testimonial h2 { font-size:clamp(2rem,3.5vw,3rem);font-weight:800;margin-bottom:60px; }
         .testi-track-wrap { overflow: hidden; }
@@ -503,7 +520,7 @@ export default function LandingPage() {
         .testi-name { font-weight:700;font-size:0.9rem; }
         .testi-jurusan { font-size:0.8rem;color:var(--muted); }
 
-        
+        /* ===== CTA FINAL ===== */
         .cta-section { padding: 80px 0; background: var(--bg-soft); }
         .cta-inner {
           background: var(--ink-2,#1A1A1A); border-radius: 32px; padding: 80px;
@@ -554,7 +571,7 @@ export default function LandingPage() {
           padding:14px 18px;font-size:0.85rem;font-weight:700;
         }
 
-        
+        /* ===== RESPONSIVE ===== */
         @media (max-width: 900px) {
           .hero { grid-template-columns: 1fr; padding: calc(68px + 52px) 0 60px; }
           .hero-right { height: 340px; }
@@ -581,7 +598,7 @@ export default function LandingPage() {
         }
       `}</style>
 
-      {}
+      {/* ===== HERO ===== */}
       <section style={{ paddingTop: 0 }}>
         <div className="container">
           <div className="hero">
@@ -600,26 +617,26 @@ export default function LandingPage() {
             </div>
 
             <div className="hero-right">
-              {}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img className="hero-photo hero-photo-1"
-                src="https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=400&h=500&fit=crop&q=80"
-                alt="Siswa belajar" />
-              {}
+                src="/jurusan/dkv.jpg"
+                alt="Siswa DKV" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img className="hero-photo hero-photo-2"
-                src="https://images.unsplash.com/photo-1580582932707-520afc8711b3?w=400&h=400&fit=crop&q=80"
-                alt="Lab komputer" />
-              {}
+                src="/jurusan/pplg.jpg"
+                alt="Siswa PPLG" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img className="hero-photo hero-photo-3"
-                src="https://images.unsplash.com/photo-1571260899304-425eee4c7efc?w=400&h=500&fit=crop&q=80"
-                alt="Siswa di kelas" />
-              {}
+                src="/jurusan/tkj.jpg"
+                alt="Siswa TKJ" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img className="hero-photo hero-photo-4"
-                src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=500&h=400&fit=crop&q=80"
-                alt="Kerja tim" />
-              {}
+                src="/jurusan/mplb.jpg"
+                alt="Siswa MPLB" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img className="hero-photo hero-photo-5"
-                src="https://images.unsplash.com/photo-1560785496-3c9d5ec3cdf7?w=400&h=440&fit=crop&q=80"
-                alt="Siswa tersenyum" />
+                src="/jurusan/pm.jpeg"
+                alt="Siswa PM" />
 
               <div className="hero-badge-float">
                 <div className="dot">
@@ -640,7 +657,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {}
+      {/* ===== MARQUEE 1 ===== */}
       <div className="marquee-section">
         <div className="marquee-track">
           {["TKJ", "PPLG", "MPLB", "Teknik", "Digital", "Kreatif", "TKJ", "PPLG", "MPLB", "Teknik", "Digital", "Kreatif"].map((item, i) => (
@@ -651,7 +668,7 @@ export default function LandingPage() {
         </div>
       </div>
 
-      {}
+      {/* ===== CHALLENGES ===== */}
       <section className="challenges">
         <div className="container">
           <div className="challenges-inner">
@@ -716,10 +733,10 @@ export default function LandingPage() {
             </div>
 
             <div className="challenges-right reveal">
-              {}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img className="challenges-img"
-                src="https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=700&h=800&fit=crop&q=80"
-                alt="Siswa belajar" />
+                src="/jurusan/pplg.jpg"
+                alt="Siswa PPLG SMK Citra Negara" />
               <div className="stat-float">
                 <div className="big">98%</div>
                 <div className="lbl">Tingkat Keterserapan Kerja</div>
@@ -729,7 +746,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {}
+      {/* ===== JURUSAN ===== */}
       <section className="jurusan" id="jurusan">
         <div className="container">
           <div className="jurusan-header reveal">
@@ -741,7 +758,7 @@ export default function LandingPage() {
             {JURUSAN_LIST.map((j) => (
               <div className={`jurusan-item reveal ${j.delay}`} key={j.kode}>
                 <div className="jurusan-img-wrap">
-                  {}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img className="jurusan-img" src={j.img} alt={j.nama} />
                   <div className="jurusan-badge">{j.kode}</div>
                 </div>
@@ -758,7 +775,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {}
+      {/* ===== ALUR PENDAFTARAN ===== */}
       <section className="alur" id="alur">
         <div className="container">
           <div className="alur-top">
@@ -811,14 +828,14 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {}
+      {/* ===== STATISTIK ===== */}
       <section className="stats" id="tentang">
         <div className="container">
           <StatsBlock />
         </div>
       </section>
 
-      {}
+      {/* ===== MARQUEE 2 ===== */}
       <div className="marquee-section-2">
         <div className="marquee-track-2">
           {["Teknik", "Kreatif", "Bisnis", "Digital", "Desain", "Jaringan", "Pemasaran", "Teknik", "Kreatif", "Bisnis", "Digital", "Desain", "Jaringan", "Pemasaran"].map((item, i) => (
@@ -829,7 +846,7 @@ export default function LandingPage() {
         </div>
       </div>
 
-      {}
+      {/* ===== TESTIMONIAL ===== */}
       <section className="testimonial">
         <div className="container">
           <div className="reveal">
@@ -871,6 +888,7 @@ export default function LandingPage() {
                   meta: "Alumni PPLG · 2021 · Frontend Developer",
                   img: "https://images.unsplash.com/photo-1494790108755-2616b612b4c0?w=80&h=80&fit=crop&q=80",
                 },
+                // duplicate for seamless loop
                 {
                   quote: "Berkat PPLG di SMK Citra Negara, gue langsung diterima kerja di startup tech sebelum lulus. Kurikulumnya relevan banget sama dunia industri sekarang.",
                   name: "Rizky Fadillah",
@@ -887,7 +905,7 @@ export default function LandingPage() {
                 <div className="testi-card" key={i}>
                   <div className="testi-quote">&ldquo;{t.quote}&rdquo;</div>
                   <div className="testi-author">
-                    {}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img className="testi-avatar" src={t.img} alt={t.name} />
                     <div>
                       <div className="testi-name">{t.name}</div>
@@ -901,7 +919,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {}
+      {/* ===== CTA FINAL ===== */}
       <section className="cta-section" id="kontak">
         <div className="container">
           <div className="cta-inner">
@@ -925,7 +943,7 @@ export default function LandingPage() {
               </div>
             </div>
             <div className="cta-deco reveal">
-              {}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="https://images.unsplash.com/photo-1571260899304-425eee4c7efc?w=520&h=520&fit=crop&q=80"
                 alt="Siswa SMK Citra Negara"
