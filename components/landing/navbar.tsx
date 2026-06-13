@@ -27,17 +27,14 @@ export default function LandingNavbar({ activePage }: LandingNavbarProps) {
   }
 
   useEffect(() => {
-    // Fetch user
     fetch("/api/auth/me")
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => { if (data?.user) setNavUser(data.user); })
       .catch(() => {});
 
-    // Scroll effect
     const handleScroll = () => setScrolled(window.scrollY > 60);
     window.addEventListener("scroll", handleScroll, { passive: true });
 
-    // Escape key
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") closeDropdown();
     };

@@ -1,10 +1,3 @@
-// ============================================================
-// PATH   : app/pendaftaran/page.tsx
-// ISI    : Formulir pendaftaran 5 tahap (calon siswa)
-//          - Data diri, akademik, orang tua, upload berkas, review
-//          - Simpan draft ke Supabase per tahap
-// ============================================================
-
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -143,7 +136,8 @@ export default function PendaftaranPage() {
   useScrollAnimation();
 
   const router = useRouter();
-  const supabase = createClient();
+  const supabaseRef = useRef(createClient());
+  const supabase = supabaseRef.current;
   const fileInputRefs = useRef<Partial<Record<BerkasKey, HTMLInputElement | null>>>({});
 
   const [step, setStep] = useState(1);
@@ -319,7 +313,8 @@ export default function PendaftaranPage() {
     }
 
     load();
-  }, [supabase, router, showToast]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     // Aktifkan warning saat form sudah mulai diisi tapi belum submit
@@ -2061,4 +2056,4 @@ export default function PendaftaranPage() {
       </div>
     </>
   );
-}
+} 

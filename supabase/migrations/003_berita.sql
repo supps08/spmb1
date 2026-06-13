@@ -1,7 +1,3 @@
--- ============================================================
--- BERITA — artikel & pengumuman sekolah
--- ============================================================
-
 create table public.berita (
   id             uuid primary key default uuid_generate_v4(),
   judul          text not null,
