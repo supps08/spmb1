@@ -1,10 +1,3 @@
-// ============================================================
-// PATH   : app/hasil-seleksi/page.tsx
-// ISI    : Halaman publik cek status pendaftaran
-//          - Input NISN → cari di tabel siswa
-//          - Tampilkan status: diterima / ditolak / menunggu / submitted
-//          - Tampilkan detail data diri + jurusan
-// ============================================================
 
 "use client";
 
@@ -579,6 +572,13 @@ export default function HasilSeleksiPage() {
           .search-row { flex-direction: column; }
           .detail-grid { grid-template-columns: 1fr; }
           .info-boxes { grid-template-columns: 1fr; }
+        }
+      
+        @media (max-width: 768px) {
+          .hs-filter-row { flex-direction: column; gap: 10px; }
+          .hs-filter-row > * { width: 100%; }
+          .hs-table-wrap { overflow-x: auto; }
+          table { min-width: 480px; }
         }
       `}</style>
 

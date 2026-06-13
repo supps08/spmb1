@@ -278,6 +278,13 @@ export default function DashboardBeritaPage() {
           .berita-table-wrap { overflow-x: auto; }
           .berita-table { min-width: 640px; }
         }
+      
+        @media (max-width: 768px) {
+          .db-berita-header { flex-direction: column; gap: 12px; }
+          .db-berita-header input, .db-berita-header select, .db-berita-header button { width: 100%; }
+          .db-table-wrap { overflow-x: auto; }
+          table { min-width: 600px; }
+        }
       `}</style>
 
       <div className="berita-dash">

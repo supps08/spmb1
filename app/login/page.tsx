@@ -11,7 +11,6 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
 
-  // Autocomplete email dari localStorage
   useEffect(() => {
     const saved = localStorage.getItem("spmb_last_email");
     if (saved) setEmail(saved);
@@ -32,9 +31,6 @@ export default function LoginPage() {
         setError(data.error || "Login gagal.");
       } else {
         localStorage.setItem("spmb_last_email", email);
-        // Redirect berdasarkan role:
-        // admin → /dashboard
-        // user biasa → /pendaftaran
         if (data.user?.role === "admin") {
           router.push("/dashboard");
         } else {
@@ -52,273 +48,84 @@ export default function LoginPage() {
     <>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap');
-
         * { box-sizing: border-box; margin: 0; padding: 0; }
-
         :root {
-          --green:        #1C5C38;
-          --green-hover:  #2A7A4E;
-          --text-dark:    #0C0C0C;
-          --card-bg:      rgba(255, 255, 255, 0.12);
-          --card-border:  rgba(255, 255, 255, 0.2);
-          --input-bg:     rgba(255, 255, 255, 0.9);
-          --input-border: rgba(255, 255, 255, 0.4);
+          --green: #1C5C38; --green-hover: #2A7A4E;
+          --text-dark: #0C0C0C;
+          --card-bg: rgba(255,255,255,0.12); --card-border: rgba(255,255,255,0.2);
+          --input-bg: rgba(255,255,255,0.9); --input-border: rgba(255,255,255,0.4);
         }
-
-        body {
-          font-family: 'Plus Jakarta Sans', sans-serif;
-          min-height: 100vh;
-          margin: 0;
-        }
-
+        body { font-family: 'Plus Jakarta Sans', sans-serif; min-height: 100vh; margin: 0; }
         .auth-page {
-          min-height: 100vh;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          position: relative;
-          overflow: hidden;
-          padding: 24px 16px;
+          min-height: 100vh; display: flex; align-items: center; justify-content: center;
+          position: relative; overflow: hidden; padding: 24px 16px;
         }
-
-        .auth-bg {
-          position: fixed !important;
-          inset: 0 !important;
-          z-index: 0 !important;
-        }
-
+        .auth-bg { position: fixed !important; inset: 0 !important; z-index: 0 !important; }
         .auth-content {
-          position: relative;
-          z-index: 1;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          width: 100%;
-          max-width: 440px;
+          position: relative; z-index: 1; display: flex; flex-direction: column;
+          align-items: center; width: 100%; max-width: 440px;
         }
-
         .auth-card {
-          background: var(--card-bg);
-          backdrop-filter: blur(16px);
-          -webkit-backdrop-filter: blur(16px);
-          border: 1px solid var(--card-border);
-          border-radius: 24px;
-          padding: 48px 40px;
-          width: 100%;
-          animation: floatIn .5s cubic-bezier(.22, 1, .36, 1) both;
+          background: var(--card-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+          border: 1px solid var(--card-border); border-radius: 24px; padding: 48px 40px;
+          width: 100%; animation: floatIn .5s cubic-bezier(.22,1,.36,1) both;
         }
-
-        @keyframes floatIn {
-          from { opacity: 0; transform: translateY(24px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-
-        .brand {
-          text-align: center;
-          margin-bottom: 32px;
-        }
-
+        @keyframes floatIn { from { opacity:0; transform:translateY(24px); } to { opacity:1; transform:translateY(0); } }
+        .brand { text-align: center; margin-bottom: 32px; }
         .brand-icon {
-          width: 56px;
-          height: 56px;
-          background: var(--green);
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin: 0 auto 16px;
-          font-size: 26px;
+          width: 56px; height: 56px; background: var(--green); border-radius: 50%;
+          display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 26px;
         }
-
         .brand h1 {
-          font-family: 'Bricolage Grotesque', sans-serif;
-          font-size: 22px;
-          font-weight: 700;
-          color: var(--text-dark);
-          letter-spacing: -0.3px;
-          line-height: 1.3;
+          font-family: 'Bricolage Grotesque', sans-serif; font-size: 22px; font-weight: 700;
+          color: var(--text-dark); letter-spacing: -0.3px; line-height: 1.3;
         }
-
-        .brand p {
-          font-size: 13px;
-          color: var(--text-dark);
-          margin-top: 8px;
-          font-weight: 400;
-          line-height: 1.6;
-          opacity: 0.75;
+        .brand p { font-size: 13px; color: var(--text-dark); margin-top: 8px; opacity: 0.75; line-height: 1.6; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; font-size: 13px; font-weight: 600; color: var(--text-dark); margin-bottom: 8px; }
+        .label-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .label-row label { margin-bottom: 0; }
+        .forgot-link { font-size: 12px; font-weight: 500; color: var(--green); text-decoration: none; }
+        .forgot-link:hover { text-decoration: underline; }
+        .input-wrap { position: relative; }
+        .input-wrap svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-dark); opacity: 0.45; pointer-events: none; }
+        input[type="email"], input[type="password"], input[type="text"], input[type="tel"] {
+          width: 100%; padding: 13px 48px 13px 42px; border: 1.5px solid var(--input-border);
+          border-radius: 10px; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 14px;
+          color: var(--text-dark); background: var(--input-bg); transition: border-color .2s, box-shadow .2s; outline: none;
         }
-
-        .form-group {
-          margin-bottom: 20px;
-        }
-
-        label {
-          display: block;
-          font-size: 13px;
-          font-weight: 600;
-          color: var(--text-dark);
-          margin-bottom: 8px;
-        }
-
-        .label-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 8px;
-        }
-
-        .label-row label {
-          margin-bottom: 0;
-        }
-
-        .forgot-link {
-          font-size: 12px;
-          font-weight: 500;
-          color: var(--green);
-          text-decoration: none;
-        }
-
-        .forgot-link:hover {
-          text-decoration: underline;
-        }
-
-        .input-wrap {
-          position: relative;
-        }
-
-        .input-wrap svg {
-          position: absolute;
-          left: 14px;
-          top: 50%;
-          transform: translateY(-50%);
-          color: var(--text-dark);
-          opacity: 0.45;
-          pointer-events: none;
-        }
-
-        input[type="email"],
-        input[type="password"],
-        input[type="text"],
-        input[type="tel"] {
-          width: 100%;
-          padding: 13px 48px 13px 42px;
-          border: 1.5px solid var(--input-border);
-          border-radius: 10px;
-          font-family: 'Plus Jakarta Sans', sans-serif;
-          font-size: 14px;
-          color: var(--text-dark);
-          background: var(--input-bg);
-          transition: border-color .2s, box-shadow .2s;
-          outline: none;
-        }
-
-        input:focus {
-          border-color: var(--green);
-          box-shadow: 0 0 0 3px rgba(28, 92, 56, 0.15);
-        }
-
+        input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(28,92,56,0.15); }
         .toggle-pass {
-          position: absolute;
-          right: 12px;
-          top: 50%;
-          transform: translateY(-50%);
-          background: none;
-          border: none;
-          cursor: pointer;
-          color: var(--text-dark);
-          opacity: 0.5;
-          padding: 4px;
-          line-height: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transition: opacity .2s;
+          position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+          background: none; border: none; cursor: pointer; color: var(--text-dark); opacity: 0.5;
+          padding: 4px; line-height: 0; display: flex; align-items: center; justify-content: center; transition: opacity .2s;
         }
-
         .toggle-pass:hover { opacity: 0.8; }
-
         .error-msg {
-          background: rgba(255, 240, 240, 0.9);
-          border: 1px solid rgba(242, 196, 196, 0.8);
-          border-radius: 10px;
-          padding: 11px 14px;
-          font-size: 13px;
-          color: #C0392B;
-          margin-bottom: 20px;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          animation: shake .3s ease;
+          background: rgba(255,240,240,0.9); border: 1px solid rgba(242,196,196,0.8); border-radius: 10px;
+          padding: 11px 14px; font-size: 13px; color: #C0392B; margin-bottom: 20px;
+          display: flex; align-items: center; gap: 8px; animation: shake .3s ease;
         }
-
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          25% { transform: translateX(-5px); }
-          75% { transform: translateX(5px); }
-        }
-
+        @keyframes shake { 0%,100% { transform:translateX(0); } 25% { transform:translateX(-5px); } 75% { transform:translateX(5px); } }
         .btn-submit {
-          width: 100%;
-          padding: 14px;
-          background: var(--green);
-          color: #FFFFFF;
-          border: none;
-          border-radius: 12px;
-          font-family: 'Plus Jakarta Sans', sans-serif;
-          font-size: 15px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: background .2s, opacity .2s;
-          margin-top: 8px;
+          width: 100%; padding: 14px; background: var(--green); color: #fff; border: none; border-radius: 12px;
+          font-family: 'Plus Jakarta Sans', sans-serif; font-size: 15px; font-weight: 600;
+          cursor: pointer; transition: background .2s, opacity .2s; margin-top: 8px;
         }
-
-        .btn-submit:hover:not(:disabled) {
-          background: var(--green-hover);
-        }
-
-        .btn-submit:disabled {
-          opacity: 0.65;
-          cursor: not-allowed;
-        }
-
-        .card-footer {
-          text-align: center;
-          font-size: 13px;
-          color: var(--text-dark);
-          margin-top: 24px;
-          opacity: 0.75;
-        }
-
-        .card-footer a {
-          color: var(--green);
-          font-weight: 600;
-          text-decoration: none;
-        }
-
-        .card-footer a:hover {
-          text-decoration: underline;
-        }
-
-        .page-footer {
-          margin-top: 20px;
-          font-size: 11px;
-          color: #FFFFFF;
-          opacity: 0.5;
-          text-align: center;
+        .btn-submit:hover:not(:disabled) { background: var(--green-hover); }
+        .btn-submit:disabled { opacity: 0.65; cursor: not-allowed; }
+        .card-footer { text-align: center; font-size: 13px; color: var(--text-dark); margin-top: 24px; opacity: 0.75; }
+        .card-footer a { color: var(--green); font-weight: 600; text-decoration: none; }
+        .card-footer a:hover { text-decoration: underline; }
+        .page-footer { margin-top: 20px; font-size: 11px; color: #fff; opacity: 0.5; text-align: center; }
+        @media (max-width: 480px) {
+          .auth-card { padding: 32px 20px; border-radius: 16px; }
+          .brand h1 { font-size: 18px; }
         }
       `}</style>
 
       <div className="auth-page">
-        <Image
-          className="auth-bg"
-          src="/sekolah/kegiatan.jpg"
-          alt=""
-          fill
-          priority
-          quality={85}
-          style={{ objectFit: "cover" }}
-        />
-
+        <Image className="auth-bg" src="/sekolah/kegiatan.jpg" alt="" fill priority quality={85} style={{ objectFit: "cover" }} />
         <div className="auth-content">
           <div className="auth-card">
             <div className="brand">
@@ -392,7 +199,6 @@ export default function LoginPage() {
               Belum punya akun? <a href="/register">Daftar Sekarang</a>
             </div>
           </div>
-
           <p className="page-footer">© 2026 SMK Citra Negara. All rights reserved</p>
         </div>
       </div>

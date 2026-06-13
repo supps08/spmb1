@@ -1,12 +1,3 @@
-// ============================================================
-// STATUS : 🆕 BARU
-// PATH   : app/dashboard/page.tsx
-// ISI    : Halaman beranda dashboard
-//          - Welcome banner
-//          - 4 stat card: total pendaftar, pendaftar hari ini, success rate, berkas kurang lengkap
-//          - Tabel pendaftar baru terkini (15 baris)
-//          - Polling real-time setiap 15 detik + animasi pulse saat update
-// ============================================================
 
 "use client";
 
@@ -494,6 +485,12 @@ export default function DashboardPage() {
           .history-table td:nth-child(4) {
             display: none;
           }
+        }
+      
+        @media (max-width: 768px) {
+          .db-stats-grid { grid-template-columns: 1fr 1fr; }
+          .db-recent-table { overflow-x: auto; }
+          table { min-width: 480px; }
         }
       `}</style>
 

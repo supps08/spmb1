@@ -1,11 +1,3 @@
-// ============================================================
-// STATUS : 🆕 BARU
-// PATH   : app/dashboard/history/page.tsx
-// ISI    : Halaman histori login lengkap (khusus admin)
-//          - Filter tab: Semua / Berhasil / Gagal
-//          - Live indicator + polling otomatis 15 detik
-//          - Tabel: nama, email, status, IP, browser, waktu
-// ============================================================
 
 "use client";
 
@@ -604,6 +596,13 @@ export default function HistoryPage() {
           .history-table td:nth-child(4) {
             display: none;
           }
+        }
+      
+        @media (max-width: 768px) {
+          .hist-filter-row { flex-direction: column; gap: 8px; }
+          .hist-filter-row > * { width: 100%; }
+          .db-table-wrap { overflow-x: auto; }
+          table { min-width: 480px; }
         }
       `}</style>
 

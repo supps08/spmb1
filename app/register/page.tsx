@@ -300,6 +300,10 @@ export default function RegisterPage() {
           opacity: 0.5;
           text-align: center;
         }
+        @media (max-width: 480px) {
+          .auth-card { padding: 32px 20px; border-radius: 16px; }
+          .brand h1 { font-size: 18px; }
+        }
       `}</style>
 
       <div className="auth-page">

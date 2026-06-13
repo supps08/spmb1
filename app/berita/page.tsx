@@ -246,6 +246,11 @@ export default function BeritaListPage() {
           color: #6B7280;
           font-size: 14px;
         }
+      
+        @media (max-width: 768px) {
+          .berita-grid { grid-template-columns: 1fr; }
+          .berita-hero { padding: 32px 16px; }
+        }
       `}</style>
 
       <LandingNavbar activePage="berita" />

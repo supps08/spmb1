@@ -1,4 +1,3 @@
-// lib/useDebounce.ts
 import { useState, useEffect } from "react";
 
 export function useDebounce<T>(value: T, delay = 300): T {

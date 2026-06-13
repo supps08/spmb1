@@ -1,10 +1,3 @@
-// ============================================================
-// STATUS : 🆕 BARU
-// PATH   : app/dashboard/profile/page.tsx
-// ISI    : Halaman profil pengguna (semua role)
-//          - Card kiri: avatar, nama, email, role, tanggal bergabung
-//          - Form kanan: edit nama, ganti password, upload avatar
-// ============================================================
 
 "use client";
 
@@ -545,6 +538,11 @@ export default function ProfilePage() {
           .profile-layout {
             grid-template-columns: 1fr;
           }
+        }
+      
+        @media (max-width: 768px) {
+          .prof-grid { grid-template-columns: 1fr; }
+          .prof-card { padding: 20px 16px; }
         }
       `}</style>
 

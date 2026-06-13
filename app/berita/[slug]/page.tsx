@@ -297,6 +297,11 @@ function DetailStyles() {
           max-height: 220px;
         }
       }
-    `}</style>
+    
+        @media (max-width: 768px) {
+          .berita-detail { padding: 24px 16px; }
+          .berita-detail img { width: 100%; height: auto; }
+        }
+      `}</style>
   );
 }

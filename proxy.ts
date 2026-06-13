@@ -1,8 +1,3 @@
-// ============================================================
-// PATH : proxy.ts
-// ISI  : Proteksi route dengan Supabase session + refresh cookie
-//        PUBLIC_PATHS bebas akses, /dashboard/* butuh session + role admin
-// ============================================================
 
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
@@ -50,12 +45,10 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  // Izinkan semua public paths
   if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
     return supabaseResponse;
   }
 
-  // Tidak ada session → redirect ke login
   if (!user) {
     if (pathname.startsWith("/api")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -63,7 +56,6 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  // Cek role untuk /dashboard/*
   if (pathname.startsWith("/dashboard") || pathname.startsWith("/api/admin")) {
     const { data: profile } = await supabase
       .from("profiles")

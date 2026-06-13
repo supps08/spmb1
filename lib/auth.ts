@@ -1,10 +1,4 @@
-// ============================================================
-// PATH : lib/auth.ts
-// ISI  : Type definitions only — runtime auth telah dimigrasikan
-//        ke Supabase Auth. Lihat lib/supabase/server.ts untuk client.
-// ============================================================
 
-// ─── User Types ──────────────────────────────────────────────
 
 /**
  * Representasi user publik yang dikembalikan oleh API.
@@ -18,7 +12,6 @@ export interface PublicUser {
   createdAt: string;
 }
 
-// ─── Login History Types ──────────────────────────────────────
 
 /**
  * Entry histori login untuk response API.

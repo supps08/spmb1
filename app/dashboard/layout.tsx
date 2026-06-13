@@ -1,13 +1,3 @@
-// ============================================================
-// STATUS : 🆕 BARU
-// PATH   : app/dashboard/layout.tsx
-// ISI    : Sidebar + Topbar (Navbar) untuk semua halaman dashboard
-//          - Sidebar: logo, nav links (admin-only gated), user chip, logout
-//          - Topbar: judul halaman, notifikasi bell real-time
-//          - Notif panel: mark as read, mark all read
-//          - Polling notifikasi setiap 10 detik
-//          - Responsive: hamburger menu di mobile
-// ============================================================
 
 "use client";
 

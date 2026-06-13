@@ -1,8 +1,3 @@
-// ============================================================
-// PATH   : app/pendaftaran/kartu/page.tsx
-// ISI    : Kartu status pendaftaran (versi sederhana)
-//          Akses: login + status siswa !== 'draft'
-// ============================================================
 
 "use client";
 
@@ -202,6 +197,11 @@ export default function KartuPendaftaranPage() {
         .kartu-back:hover { text-decoration: underline; }
         @media (max-width: 480px) {
           .kartu-fields { grid-template-columns: 1fr; }
+        }
+      
+        @media (max-width: 768px) {
+          .kartu-wrap { padding: 16px; }
+          .kartu-print { transform: none; width: 100%; }
         }
       `}</style>
 

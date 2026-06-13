@@ -1,11 +1,3 @@
-// ============================================================
-// PATH   : app/dashboard/laporan/page.tsx
-// ISI    : Halaman Laporan Penerimaan
-//          - 4 stat cards (total, diterima, ditolak, menunggu)
-//          - Tabel rekap per jurusan + progress bar
-//          - Bar chart tren harian 7 hari (Recharts)
-//          - Info card penutupan pendaftaran
-// ============================================================
 
 "use client";
 
@@ -124,7 +116,6 @@ export default function LaporanPage() {
     Record<string, JurusanDetailData>
   >({});
   const [loadingDetailId, setLoadingDetailId] = useState<string | null>(null);
-
 
   useEffect(() => {
     async function fetchAll() {
@@ -293,7 +284,6 @@ export default function LaporanPage() {
     },
     [expandedJurusan, jurusanDetails, fetchJurusanDetail]
   );
-
 
   const maxTrend = useMemo(
     () => Math.max(...trend.map((t) => t.jumlah), 0),

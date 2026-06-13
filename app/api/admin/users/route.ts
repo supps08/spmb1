@@ -1,15 +1,9 @@
-// ============================================================
-// PATH : app/api/admin/users/route.ts
-// ISI  : GET  → daftar semua user dari tabel profiles (admin only)
-//        POST → buat user baru (membutuhkan SUPABASE_SERVICE_ROLE_KEY)
-// ============================================================
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import type { PublicUser } from "@/lib/auth";
 
-// ─── Helper: verifikasi admin ─────────────────────────────────
 async function requireAdmin() {
   const supabase = await createClient();
 
@@ -32,7 +26,6 @@ async function requireAdmin() {
   return { supabase, adminUser: user, error: null };
 }
 
-// ─── GET /api/admin/users ─────────────────────────────────────
 export async function GET() {
   const { supabase, error } = await requireAdmin();
 
@@ -52,7 +45,6 @@ export async function GET() {
     return NextResponse.json({ error: "Gagal mengambil data user." }, { status: 500 });
   }
 
-  // Map ke format response yang sama dengan sebelumnya
   const users = (profiles ?? []).map((p) => ({
     id: p.id,
     name: p.full_name,
@@ -65,7 +57,6 @@ export async function GET() {
   return NextResponse.json({ users });
 }
 
-// ─── POST /api/admin/users ────────────────────────────────────
 export async function POST(req: NextRequest) {
   const { supabase: _supabase, error } = await requireAdmin();
 
@@ -107,17 +98,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Role tidak valid." }, { status: 400 });
   }
 
-  // TODO: Tambahkan SUPABASE_SERVICE_ROLE_KEY ke .env.local untuk mengaktifkan
-  //       pembuatan user dari admin panel. Tanpa service role key, endpoint ini
-  //       tidak dapat membuat user baru karena supabase.auth.admin.createUser()
-  //       memerlukan hak akses service role.
-  //
-  //       Langkah:
-  //       1. Buka Supabase Dashboard → Project Settings → API
-  //       2. Salin "service_role" key (BUKAN anon key)
-  //       3. Tambahkan ke .env.local:
-  //          SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
-  //
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!serviceRoleKey) {
@@ -131,7 +111,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Gunakan admin client dengan service role key
   const adminClient = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     serviceRoleKey
@@ -156,7 +135,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Gagal membuat user." }, { status: 500 });
   }
 
-  // Insert ke tabel profiles
   const { error: profileError } = await adminClient
     .from("profiles")
     .insert({

@@ -1,10 +1,3 @@
-// ============================================================
-// PATH : app/dashboard/users/page.tsx
-// ISI  : Halaman Manajemen Pendaftar
-//        - Data dari tabel siswa (non-draft)
-//        - Filter jurusan, status, sort, search
-//        - Kartu pendaftar + tombol Detail / Verifikasi
-// ============================================================
 
 "use client";
 
@@ -1093,6 +1086,13 @@ export default function UsersPage() {
           .filter-controls { flex-direction: column; align-items: stretch; }
           .control-group { justify-content: space-between; }
           .modal-grid { grid-template-columns: 1fr; }
+        }
+      
+        @media (max-width: 768px) {
+          .usr-header { flex-direction: column; gap: 12px; }
+          .usr-header input, .usr-header select, .usr-header button { width: 100%; }
+          .db-table-wrap { overflow-x: auto; }
+          table { min-width: 600px; }
         }
       `}</style>
 

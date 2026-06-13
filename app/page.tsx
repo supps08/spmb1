@@ -1,17 +1,3 @@
-// ============================================================
-// PATH   : app/page.tsx
-// ISI    : Landing Page SPMB SMK Citra Negara
-//          - Navbar fixed (scroll effect)
-//          - Hero + foto grid floating
-//          - Marquee jurusan
-//          - Challenges section
-//          - Jurusan unggulan (PPLG, TKJ, MPLB)
-//          - Alur pendaftaran 4 langkah
-//          - Statistik (counter animation)
-//          - Testimonial carousel
-//          - CTA Final
-//          - Footer
-// ============================================================
 
 "use client";
 
@@ -221,7 +207,6 @@ export default function LandingPage() {
         .reveal-delay-2 { transition-delay: 0.2s; }
         .reveal-delay-3 { transition-delay: 0.3s; }
 
-        /* ===== HERO ===== */
         .hero {
           padding: 140px 0 100px;
           padding-top: calc(68px + 72px);
@@ -287,7 +272,6 @@ export default function LandingPage() {
           display: flex; align-items: center; justify-content: center; flex-shrink: 0;
         }
 
-        /* ===== MARQUEE ===== */
         .marquee-section { background: var(--ink-2,#1A1A1A); padding: 22px 0; overflow: hidden; }
         .marquee-track {
           display: flex; width: max-content;
@@ -301,7 +285,6 @@ export default function LandingPage() {
         }
         .marquee-dot { width:6px;height:6px;background:var(--accent);border-radius:50%;flex-shrink:0; }
 
-        /* ===== CHALLENGES ===== */
         .challenges { background: var(--bg-soft); padding: 120px 0; }
         .challenges-inner {
           display: grid; grid-template-columns: 1fr 1fr;
@@ -334,7 +317,6 @@ export default function LandingPage() {
         .stat-float .big { font-family:'Bricolage Grotesque',sans-serif;font-size:2rem;font-weight:800;color:var(--ink); }
         .stat-float .lbl { font-size:0.8rem;color:var(--muted);margin-top:2px; }
 
-        /* ===== JURUSAN ===== */
         .jurusan { padding: 120px 0; }
         .jurusan-header { margin-bottom: 60px; }
         .jurusan h2 { font-size: clamp(2rem,3.5vw,3rem); font-weight: 800; }
@@ -359,7 +341,6 @@ export default function LandingPage() {
         .jurusan-arrow { margin-top:16px;display:inline-flex;align-items:center;gap:6px;font-size:0.82rem;font-weight:600;color:var(--accent);text-decoration:none; }
         .jurusan-arrow:hover { text-decoration:underline; }
 
-        /* ===== ALUR ===== */
         .alur { padding: 120px 0; background: var(--bg); }
         .alur-top { display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:80px;gap:40px; }
         .alur-top-left { flex: 1; }
@@ -376,7 +357,6 @@ export default function LandingPage() {
         .step-title { font-family:'Bricolage Grotesque',sans-serif;font-size:1.2rem;font-weight:700;margin-bottom:10px;letter-spacing:-0.01em; }
         .step-desc { font-size:0.9rem;color:var(--muted);line-height:1.65;max-width:480px; }
 
-        /* ===== STATISTIK ===== */
         .stats { background: var(--ink-2,#1A1A1A); padding: 120px 0; }
         .stats-label { color: rgba(255,255,255,0.5); }
         .stats-label::before { background: var(--accent); }
@@ -501,13 +481,11 @@ export default function LandingPage() {
           font-size: 0.88rem; color: rgba(255,255,255,0.8);
         }
 
-        /* ===== MARQUEE 2 ===== */
         .marquee-section-2 { background:var(--bg-soft);padding:22px 0;overflow:hidden; }
         .marquee-track-2 { display:flex;width:max-content;animation:marquee-right 40s linear infinite; }
         .marquee-item-2 { display:flex;align-items:center;gap:24px;padding:0 24px;font-size:0.82rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:rgba(0,0,0,0.3);white-space:nowrap; }
         .marquee-dot-2 { width:5px;height:5px;background:var(--accent);border-radius:50%;flex-shrink:0; }
 
-        /* ===== TESTIMONIAL ===== */
         .testimonial { padding: 120px 0; overflow: hidden; }
         .testimonial h2 { font-size:clamp(2rem,3.5vw,3rem);font-weight:800;margin-bottom:60px; }
         .testi-track-wrap { overflow: hidden; }
@@ -520,7 +498,6 @@ export default function LandingPage() {
         .testi-name { font-weight:700;font-size:0.9rem; }
         .testi-jurusan { font-size:0.8rem;color:var(--muted); }
 
-        /* ===== CTA FINAL ===== */
         .cta-section { padding: 80px 0; background: var(--bg-soft); }
         .cta-inner {
           background: var(--ink-2,#1A1A1A); border-radius: 32px; padding: 80px;
@@ -571,7 +548,6 @@ export default function LandingPage() {
           padding:14px 18px;font-size:0.85rem;font-weight:700;
         }
 
-        /* ===== RESPONSIVE ===== */
         @media (max-width: 900px) {
           .hero { grid-template-columns: 1fr; padding: calc(68px + 52px) 0 60px; }
           .hero-right { height: 340px; }
@@ -588,17 +564,56 @@ export default function LandingPage() {
           .stats-cards-grid { grid-template-columns: repeat(2,1fr); }
           .cta-inner { grid-template-columns: 1fr; padding: 48px; }
           .cta-deco { display: none; }
+          .challenges { padding: 72px 0; }
+          .jurusan { padding: 72px 0; }
+          .alur { padding: 72px 0; }
+          .stats { padding: 72px 0; }
+          .testimonial { padding: 72px 0; }
+          .cta-section { padding: 56px 0; }
         }
 
         @media (max-width: 600px) {
-          .stats-cards-grid { grid-template-columns: 1fr 1fr; }
+          .container { padding: 0 20px; }
+          .hero { padding: calc(68px + 32px) 0 40px; }
+          .hero-right { height: 280px; }
+          .hero-photo-1 { width:120px;height:150px;left:8px; }
+          .hero-photo-2 { width:100px;height:125px;left:138px; }
+          .hero-photo-3 { width:110px;height:140px;right:4px; }
+          .hero-photo-4 { width:130px;height:110px;bottom:10px;left:4px; }
+          .hero-photo-5 { width:105px;height:130px;bottom:8px;right:8px; }
+          .hero-badge-float { display: none; }
+          .hero-ctas { flex-direction: column; }
+          .hero-ctas a, .hero-ctas button { width: 100%; text-align: center; justify-content: center; }
+          .stats-cards-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+          .stat-card { padding: 24px 16px; }
           .alur-step { grid-template-columns: 60px 1px 1fr; gap: 0 20px; }
           .step-num { font-size: 2rem; }
-          .hero-ctas { flex-direction: column; }
+          .alur-top { margin-bottom: 48px; }
+          .alur-top a { display: none; }
+          .testi-card { width: 300px; padding: 24px; }
+          .cta-inner { padding: 32px 24px; }
+          .stats-carousel-frame { height: 220px; }
+          .challenges { padding: 56px 0; }
+          .jurusan { padding: 56px 0; }
+          .alur { padding: 56px 0; }
+          .stats { padding: 56px 0; }
+          .testimonial { padding: 56px 0; }
+          .stats-modal-card { margin: 16px; padding: 24px 20px; max-height: 85vh; overflow-y: auto; }
+          .stats-modal-table td { padding: 8px 10px; font-size: 12px; }
+          .stats-modal-mitra-grid { grid-template-columns: 1fr 1fr; }
+        }
+
+        @media (max-width: 400px) {
+          .hero-right { height: 220px; }
+          .hero-photo-1 { width:90px;height:115px; }
+          .hero-photo-2 { width:78px;height:98px;left:104px; }
+          .hero-photo-3 { width:88px;height:110px; }
+          .hero-photo-4 { width:100px;height:88px; }
+          .hero-photo-5 { width:82px;height:100px; }
+          .stats-cards-grid { grid-template-columns: 1fr; }
         }
       `}</style>
 
-      {/* ===== HERO ===== */}
       <section style={{ paddingTop: 0 }}>
         <div className="container">
           <div className="hero">
@@ -657,7 +672,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ===== MARQUEE 1 ===== */}
       <div className="marquee-section">
         <div className="marquee-track">
           {["TKJ", "PPLG", "MPLB", "Teknik", "Digital", "Kreatif", "TKJ", "PPLG", "MPLB", "Teknik", "Digital", "Kreatif"].map((item, i) => (
@@ -668,7 +682,6 @@ export default function LandingPage() {
         </div>
       </div>
 
-      {/* ===== CHALLENGES ===== */}
       <section className="challenges">
         <div className="container">
           <div className="challenges-inner">
@@ -746,7 +759,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ===== JURUSAN ===== */}
       <section className="jurusan" id="jurusan">
         <div className="container">
           <div className="jurusan-header reveal">
@@ -775,7 +787,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ===== ALUR PENDAFTARAN ===== */}
       <section className="alur" id="alur">
         <div className="container">
           <div className="alur-top">
@@ -828,14 +839,12 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ===== STATISTIK ===== */}
       <section className="stats" id="tentang">
         <div className="container">
           <StatsBlock />
         </div>
       </section>
 
-      {/* ===== MARQUEE 2 ===== */}
       <div className="marquee-section-2">
         <div className="marquee-track-2">
           {["Teknik", "Kreatif", "Bisnis", "Digital", "Desain", "Jaringan", "Pemasaran", "Teknik", "Kreatif", "Bisnis", "Digital", "Desain", "Jaringan", "Pemasaran"].map((item, i) => (
@@ -846,7 +855,6 @@ export default function LandingPage() {
         </div>
       </div>
 
-      {/* ===== TESTIMONIAL ===== */}
       <section className="testimonial">
         <div className="container">
           <div className="reveal">
@@ -919,7 +927,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ===== CTA FINAL ===== */}
       <section className="cta-section" id="kontak">
         <div className="container">
           <div className="cta-inner">
